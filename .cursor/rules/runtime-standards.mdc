@@ -1,0 +1,9 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+all the tools sed, grep, findutils are all the gnu toolchain and not the macos ones
+the server must be run as ./dev.sh run
+
+to find the running server use lsof -i :8000 because dev.sh runs on port 8000

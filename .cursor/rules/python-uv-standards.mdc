@@ -1,0 +1,84 @@
+---
+description: Python development with uv package management standards
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Python Development with uv Standards
+
+## Python Package Management and Execution
+- **ALWAYS** use `uv` for Python package management and execution
+- **NEVER** use `pip`, `python`, `python3`, or `pipenv` directly
+- **NEVER** use virtual environment activation commands like `source .venv/bin/activate`
+
+## Code Execution
+- **ALWAYS** use `uv run` to execute Python scripts and modules
+- Examples:
+  - `uv run python script.py` instead of `python script.py`
+  - `uv run python -m module` instead of `python -m module`
+  - `uv run pytest` instead of `pytest`
+  - `uv run flask run` instead of `flask run`
+  - `uv run python -c "code"` for quick Python commands
+
+## Dependency Management
+- Use `uv sync` to install/update dependencies from `pyproject.toml` and `uv.lock`
+- Use `uv add package-name` to add new dependencies
+- Use `uv remove package-name` to remove dependencies
+- Use `uv lock` to update the lock file
+- Use `uv tree` to view dependency tree
+
+## Development Commands
+- Testing: `uv run pytest` or `uv run python -m pytest`
+- Linting: `uv run flake8` or `uv run ruff check`
+- Formatting: `uv run black .` or `uv run ruff format`
+- Type checking: `uv run mypy`
+- Documentation: `uv run sphinx-build`
+
+## Project Setup
+- Use `uv init` for new projects
+- Use `uv python install` to install Python versions
+- Use `uv venv` only if explicitly needed for virtual environment creation
+
+## Environment Variables and Scripts
+- When suggesting scripts or commands, always prefix Python execution with `uv run`
+- For shell scripts, ensure they use `uv run` for any Python commands
+- For Makefiles, use `uv run` in Python-related targets
+
+## Examples of Correct Commands:
+```bash
+# Running the main application
+uv run python run_server.py
+
+# Running tests
+uv run pytest tests/
+
+# Installing dependencies
+uv sync
+
+# Adding a new dependency
+uv add requests
+
+# Running a specific test file
+uv run pytest tests/test_example.py
+
+# Running Python modules
+uv run python -m http.server 8000
+
+# Running development server
+uv run python -m flask run --host=0.0.0.0 --port=5000
+```
+
+## What NOT to do:
+```bash
+# WRONG - Don't use these
+pip install package
+python script.py
+python -m pytest
+source .venv/bin/activate
+pipenv run python script.py
+```
+
+## IDE Integration
+- Configure IDE to use `uv run` for Python execution
+- Set Python interpreter path to the one managed by uv
+- Use `uv run` in IDE terminal commands and run configurations
