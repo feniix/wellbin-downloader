@@ -12,7 +12,6 @@ To the new unified CLI:
 - uv run wellbin convert
 """
 
-import os
 import shutil
 from pathlib import Path
 
@@ -131,7 +130,7 @@ def migrate(backup, clean):
 
     # Clean up if requested
     if clean:
-        click.echo(f"\n🧹 Cleaning up old scripts...")
+        click.echo("\n🧹 Cleaning up old scripts...")
         if not backup:
             if not click.confirm(
                 "⚠️  You didn't create backups. Are you sure you want to delete the old scripts?"

@@ -203,6 +203,6 @@ def scrape(email, password, limit, types, output, headless, dry_run):
             file_count = len(by_type[study_type])
             click.echo(f"  {config['icon']} {config['subdir']}/  ({file_count} files)")
 
-        click.echo(f"\n💡 Next steps:")
-        click.echo(f"   📄 Convert to markdown: uv run wellbin convert")
+        click.echo("\n💡 Next steps:")
+        click.echo("   📄 Convert to markdown: uv run wellbin convert")
         click.echo(f"   🔍 View files: ls -la {final_output}/*/")

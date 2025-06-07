@@ -6,7 +6,6 @@ to markdown format optimized for LLM consumption.
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -140,7 +139,6 @@ class PDFToMarkdownConverter:
             all_words = []
 
             # Document header with overall metadata
-            doc_metadata = chunks[0].get("metadata", {}) if chunks else {}
             total_pages = len(chunks)
             total_tables = sum(len(chunk.get("tables", [])) for chunk in chunks)
 
@@ -167,7 +165,6 @@ class PDFToMarkdownConverter:
             # Add each page as a section
             for i, chunk in enumerate(chunks):
                 page_num = i + 1
-                page_metadata = chunk.get("metadata", {})
                 page_tables = chunk.get("tables", [])
                 page_words = chunk.get("words", [])
 
@@ -254,7 +251,7 @@ Total words: {len(all_words)}
             print(f"📄 Converting {pdf_path.name}...")
             if self.enhanced_mode:
                 print(
-                    f"  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)"
+                    "  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)"
                 )
 
             # Extract markdown with advanced features
@@ -340,16 +337,16 @@ Total words: {len(all_words)}
 
         if all_converted_files:
             total_size = sum(f.stat().st_size for f in all_converted_files)
-            print(f"\n📊 Results:")
+            print("\n📊 Results:")
             print(f"   📁 Output directory: {self.output_dir}")
             print(
                 f"   💾 Total size: {total_size:,} bytes ({total_size/1024/1024:.2f} MB)"
             )
 
             if self.enhanced_mode:
-                print(f"   🎯 Enhanced features: ✓")
-                print(f"   📑 Page chunks: Embedded as sections in single files")
-                print(f"   📊 Word positions: Embedded in footer sections")
+                print("   🎯 Enhanced features: ✓")
+                print("   📑 Page chunks: Embedded as sections in single files")
+                print("   📊 Word positions: Embedded in footer sections")
 
         return all_converted_files
 

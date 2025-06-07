@@ -599,7 +599,7 @@ class WellbinMedicalDownloader:
                     return [pdf_info]
                 else:
                     # Debug: show all links on the page
-                    print(f"  🔍 All links on page:")
+                    print("  🔍 All links on page:")
                     all_links = self.driver.find_elements(By.TAG_NAME, "a")[
                         :10
                     ]  # First 10 links
@@ -610,7 +610,7 @@ class WellbinMedicalDownloader:
                             f"    {i}. '{text}' -> {href[:80] if href else 'No href'}..."
                         )
 
-                    print(f"  ❌ No S3 download link found")
+                    print("  ❌ No S3 download link found")
                     return []
 
             except Exception as e:
@@ -686,7 +686,7 @@ class WellbinMedicalDownloader:
                         f.write(chunk)
                         file_size += len(chunk)
 
-            print(f"  ✅ Downloaded successfully!")
+            print("  ✅ Downloaded successfully!")
             print(f"  📏 File size: {file_size:,} bytes ({file_size/1024/1024:.2f} MB)")
             return filepath
 

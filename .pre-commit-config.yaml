@@ -14,13 +14,12 @@ repos:
         types: [python]
         args: ["--profile", "black"]
 
-      # Temporarily disabled flake8 for initial setup
-      # - id: flake8
-      #   name: flake8
-      #   entry: uv run flake8
-      #   language: system
-      #   types: [python]
-      #   exclude: ^\.venv/
+      - id: flake8
+        name: flake8
+        entry: uv run flake8
+        language: system
+        types: [python]
+        exclude: ^\.venv/
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

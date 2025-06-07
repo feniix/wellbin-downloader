@@ -105,7 +105,7 @@ def convert(input_dir, output_dir, preserve_structure, file_type, enhanced_mode)
     click.echo(f"📂 Input directory: {final_input_dir}")
     click.echo(f"📁 Output directory: {final_output_dir}")
     click.echo(f"🎯 File type filter: {final_file_type}")
-    click.echo(f"🧠 Processing: LLM-optimized markdown extraction")
+    click.echo("🧠 Processing: LLM-optimized markdown extraction")
 
     if final_preserve_structure:
         click.echo("📁 Preserving subdirectory structure")
@@ -140,7 +140,7 @@ def convert(input_dir, output_dir, preserve_structure, file_type, enhanced_mode)
         converted_files = converter.convert_all_pdfs()
 
     if converted_files:
-        click.echo(f"\n💡 LLM Usage Examples:")
+        click.echo("\n💡 LLM Usage Examples:")
         click.echo(f"   📖 Read a report: cat {final_output_dir}/20250604-lab-0.md")
         click.echo(f"   🔍 Search all reports: grep -r 'keyword' {final_output_dir}/")
         click.echo(
@@ -157,14 +157,14 @@ def convert(input_dir, output_dir, preserve_structure, file_type, enhanced_mode)
         )
 
         if final_enhanced_mode:
-            click.echo(f"\n🎯 Enhanced Mode Features:")
+            click.echo("\n🎯 Enhanced Mode Features:")
             click.echo(
-                f"   📑 Page chunks: Embedded as sections in single markdown files"
+                "   📑 Page chunks: Embedded as sections in single markdown files"
             )
-            click.echo(f"   📊 Word positions: Embedded in hidden footer sections")
-            click.echo(f"   📋 Table detection: Built-in with position data")
-            click.echo(f"   🧠 Medical headers: Optimized for lab/imaging reports")
-            click.echo(f"   🚫 Images: Disabled (text-only processing)")
+            click.echo("   📊 Word positions: Embedded in hidden footer sections")
+            click.echo("   📋 Table detection: Built-in with position data")
+            click.echo("   🧠 Medical headers: Optimized for lab/imaging reports")
+            click.echo("   🚫 Images: Disabled (text-only processing)")
     else:
         click.echo("❌ No files were converted")
         click.echo("💡 Check that the input directory exists and contains PDF files")
