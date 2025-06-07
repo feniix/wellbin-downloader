@@ -20,7 +20,7 @@ load_dotenv()
 @click.group()
 @click.version_option(version=__version__, prog_name="wellbin")
 @click.pass_context
-def cli(ctx):
+def cli(ctx: click.Context) -> None:
     """
     Wellbin Medical Data Downloader
 
@@ -61,7 +61,7 @@ cli.add_command(convert)
 
 
 # Convenience function for programmatic access
-def main():
+def main() -> None:
     """Main entry point for the CLI application."""
     cli()
 

@@ -6,9 +6,12 @@ Contains common helper functions used across the package.
 
 import os
 from pathlib import Path
+from typing import Any, Callable, Optional, Tuple
 
 
-def get_env_default(env_var, fallback, convert_type=None):
+def get_env_default(
+    env_var: str, fallback: Any, convert_type: Optional[Callable[[str], Any]] = None
+) -> Any:
     """Helper to get environment variable with proper empty value handling"""
     value = os.getenv(env_var, "").strip()
     if not value:
@@ -21,7 +24,11 @@ def get_env_default(env_var, fallback, convert_type=None):
     return value
 
 
-def get_env_or_default(env_var, default_value, convert_type=None):
+def get_env_or_default(
+    env_var: str,
+    default_value: Any,
+    convert_type: Optional[Callable[[str], Any]] = None,
+) -> Any:
     """
     Get value from environment variable with proper fallback handling.
 
@@ -52,7 +59,7 @@ def get_env_or_default(env_var, default_value, convert_type=None):
     return result
 
 
-def create_config_file():
+def create_config_file() -> None:
     """Create a .env configuration file with default values and helpful comments"""
     import click
 
@@ -164,7 +171,7 @@ WELLBIN_ENHANCED_MODE=false
         click.echo(f"❌ Error creating configuration file: {e}")
 
 
-def validate_credentials(email, password):
+def validate_credentials(email: str, password: str) -> Tuple[bool, str]:
     """Validate that credentials are provided and not default values"""
     if not email or email == "your-email@example.com":
         return False, "Email not configured. Please set WELLBIN_EMAIL or use --email"

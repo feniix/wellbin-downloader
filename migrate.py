@@ -14,6 +14,7 @@ To the new unified CLI:
 
 import shutil
 from pathlib import Path
+from typing import List
 
 import click
 
@@ -29,7 +30,7 @@ import click
     is_flag=True,
     help="Remove old scripts after successful migration",
 )
-def migrate(backup, clean):
+def migrate(backup: bool, clean: bool) -> None:
     """
     Migrate from old standalone scripts to new package structure.
 
@@ -38,19 +39,23 @@ def migrate(backup, clean):
     2. Optionally create backups
     3. Show migration commands
     4. Optionally clean up old files
+
+    Args:
+        backup: Whether to create backups of old scripts
+        clean: Whether to remove old scripts after migration
     """
 
     click.echo("🔄 Wellbin Migration Tool")
     click.echo("=" * 50)
 
     # Check for old scripts
-    old_scripts = [
+    old_scripts: List[str] = [
         "wellbin_scrape_labs.py",
         "convert_pdfs_to_markdown.py",
         "interactive_scraper.py",
     ]
 
-    found_scripts = []
+    found_scripts: List[str] = []
     for script in old_scripts:
         if Path(script).exists():
             found_scripts.append(script)
@@ -66,12 +71,12 @@ def migrate(backup, clean):
 
     # Create backups if requested
     if backup:
-        backup_dir = Path("old_scripts_backup")
+        backup_dir: Path = Path("old_scripts_backup")
         backup_dir.mkdir(exist_ok=True)
 
         click.echo(f"\n📦 Creating backups in {backup_dir}/")
         for script in found_scripts:
-            backup_path = backup_dir / script
+            backup_path: Path = backup_dir / script
             shutil.copy2(script, backup_path)
             click.echo(f"   ✅ Backed up {script} -> {backup_path}")
 
@@ -119,7 +124,8 @@ def migrate(backup, clean):
     click.echo("   uv run wellbin convert             # Convert to markdown")
 
     # Environment file migration
-    if Path(".env").exists():
+    env_path: Path = Path(".env")
+    if env_path.exists():
         click.echo("\n📄 Environment File:")
         click.echo("   ✅ Found existing .env file")
         click.echo("   💡 Your configuration should work with the new CLI")

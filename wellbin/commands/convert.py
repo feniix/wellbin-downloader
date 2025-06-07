@@ -2,6 +2,8 @@
 Convert command for converting PDFs to markdown format.
 """
 
+from typing import Optional
+
 import click
 from dotenv import load_dotenv
 
@@ -39,7 +41,13 @@ load_dotenv()
     is_flag=True,
     help="Enable enhanced mode with page chunks, tables, and word positions (overrides WELLBIN_ENHANCED_MODE env var)",
 )
-def convert(input_dir, output_dir, preserve_structure, file_type, enhanced_mode):
+def convert(
+    input_dir: Optional[str],
+    output_dir: Optional[str],
+    preserve_structure: bool,
+    file_type: Optional[str],
+    enhanced_mode: bool,
+) -> None:
     """
     Convert medical PDFs to markdown format optimized for LLM consumption.
 
@@ -70,29 +78,29 @@ def convert(input_dir, output_dir, preserve_structure, file_type, enhanced_mode)
     # PROPER PRECEDENCE: CLI args override env vars override defaults
     # Only use environment variables when CLI argument is NOT provided
 
-    final_input_dir = (
+    final_input_dir: str = (
         input_dir
         if input_dir is not None
         else get_env_or_default("WELLBIN_INPUT_DIR", "medical_data")
     )
-    final_output_dir = (
+    final_output_dir: str = (
         output_dir
         if output_dir is not None
         else get_env_or_default("WELLBIN_MARKDOWN_DIR", "markdown_reports")
     )
-    final_file_type = (
+    final_file_type: str = (
         file_type
         if file_type is not None
         else get_env_or_default("WELLBIN_FILE_TYPE", "all")
     )
 
     # For flags: True if flag is provided, otherwise check env var, otherwise False
-    final_preserve_structure = (
+    final_preserve_structure: bool = (
         preserve_structure
         if preserve_structure
         else get_env_or_default("WELLBIN_PRESERVE_STRUCTURE", "true", bool)
     )
-    final_enhanced_mode = (
+    final_enhanced_mode: bool = (
         enhanced_mode
         if enhanced_mode
         else get_env_or_default("WELLBIN_ENHANCED_MODE", "false", bool)

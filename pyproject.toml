@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pymupdf4llm>=0.0.5",
     "click>=8.0.0",
+    "types-requests>=2.32.0.20250602",
 ]
 readme = "README.md"
 license = {text = "MIT"}
@@ -50,7 +51,7 @@ dev-dependencies = [
     "black>=22.0.0",
     "isort>=5.10.0",
     "flake8>=5.0.0",
-    "mypy>=0.991",
+    "pyright>=1.1.400",
     "bandit>=1.7.4",
     "safety>=2.3.0",
 ]
@@ -82,6 +83,79 @@ known_first_party = ["wellbin"]
 max-line-length = 88
 extend-ignore = ["E203", "W503", "F811"]
 exclude = [".venv", "__pycache__", ".git", "build", "dist"]
+
+[tool.pyright]
+include = ["wellbin", "migrate.py"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "build",
+    "dist",
+]
+pythonVersion = "3.9"
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportImportCycles = true
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportDuplicateImport = true
+reportOptionalSubscript = true
+reportOptionalMemberAccess = true
+reportOptionalCall = true
+reportOptionalIterable = true
+reportOptionalContextManager = true
+reportOptionalOperand = true
+reportTypedDictNotRequiredAccess = false
+reportPrivateUsage = false
+reportConstantRedefinition = true
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportUntypedFunctionDecorator = false
+reportUnknownParameterType = true
+reportUnknownArgumentType = false
+reportUnknownLambdaType = true
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportMissingParameterType = true
+reportMissingTypeArgument = true
+reportInvalidTypeVarUse = true
+reportCallInDefaultInitializer = true
+reportUnnecessaryIsInstance = true
+reportUnnecessaryCast = true
+reportUnnecessaryComparison = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportImplicitStringConcatenation = false
+reportUndefinedVariable = true
+reportUnboundVariable = true
+reportInvalidStubStatement = true
+reportIncompleteStub = true
+reportUnsupportedDunderAll = true
+reportUnusedCoroutine = true
+reportFunctionMemberAccess = true
+reportGeneralTypeIssues = true
+reportPropertyTypeMismatch = true
+reportWildcardImportFromLibrary = true
+reportAbstractUsage = true
+reportArgumentType = true
+reportAssignmentType = true
+reportAttributeAccessIssue = true
+reportCallIssue = true
+reportInconsistentConstructor = true
+reportIndexIssue = true
+reportInvalidTypeArguments = true
+reportOperatorIssue = true
+reportRedeclaration = true
+reportReturnType = true
+reportTypeCommentUsage = true
+reportUnreachable = true
+reportUnusedExpression = true
+reportUnnecessaryTypeIgnoreComment = false
+reportMatchNotExhaustive = true
 
 [dependency-groups]
 dev = [

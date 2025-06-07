@@ -8,14 +8,18 @@ to markdown format optimized for LLM consumption.
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import pymupdf4llm
 
 
 class PDFToMarkdownConverter:
     def __init__(
-        self, pdf_dir="medical_data", output_dir="markdown_reports", enhanced_mode=False
-    ):
+        self,
+        pdf_dir: str = "medical_data",
+        output_dir: str = "markdown_reports",
+        enhanced_mode: bool = False,
+    ) -> None:
         """
         Initialize PDF to Markdown converter with enhanced PyMuPDF4LLM features
 
@@ -31,7 +35,9 @@ class PDFToMarkdownConverter:
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def medical_header_detector(self, span, page=None):
+    def medical_header_detector(
+        self, span: Dict[str, Any], page: Optional[Any] = None
+    ) -> str:
         """
         Custom header detection optimized for medical documents
 
@@ -98,7 +104,9 @@ class PDFToMarkdownConverter:
 
         return ""
 
-    def extract_enhanced_markdown(self, pdf_path):
+    def extract_enhanced_markdown(
+        self, pdf_path: Path
+    ) -> Optional[Union[str, List[Dict[str, Any]]]]:
         """Extract markdown with all advanced PyMuPDF4LLM features"""
         try:
             if self.enhanced_mode:
@@ -124,9 +132,11 @@ class PDFToMarkdownConverter:
             print(f"❌ Error extracting markdown from {pdf_path}: {e}")
             return None
 
-    def save_enhanced_chunks(self, chunks, pdf_path):
+    def save_enhanced_chunks(
+        self, chunks: Union[str, List[Dict[str, Any]]], pdf_path: Path
+    ) -> List[Path]:
         """Save enhanced page chunks embedded in a single markdown file"""
-        converted_files = []
+        converted_files: List[Path] = []
         base_name = pdf_path.stem
 
         if isinstance(chunks, list):
@@ -135,8 +145,8 @@ class PDFToMarkdownConverter:
             output_path = self.output_dir / output_filename
 
             # Build the complete document with embedded chunks
-            content_parts = []
-            all_words = []
+            content_parts: List[str] = []
+            all_words: List[Any] = []
 
             # Document header with overall metadata
             total_pages = len(chunks)
@@ -245,7 +255,7 @@ Total words: {len(all_words)}
 
         return converted_files
 
-    def convert_pdf_to_markdown(self, pdf_path):
+    def convert_pdf_to_markdown(self, pdf_path: Path) -> Optional[List[Path]]:
         """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features"""
         try:
             print(f"📄 Converting {pdf_path.name}...")
@@ -288,7 +298,7 @@ Total words: {len(all_words)}
             print(f"  ❌ Error converting {pdf_path.name}: {e}")
             return None
 
-    def convert_all_pdfs(self):
+    def convert_all_pdfs(self) -> List[Path]:
         """Convert all PDFs in the directory with enhanced features"""
         if not self.pdf_dir.exists():
             print(f"❌ PDF directory {self.pdf_dir} not found")
@@ -311,8 +321,8 @@ Total words: {len(all_words)}
         print(f"📁 Output directory: {self.output_dir}")
         print("=" * 60)
 
-        all_converted_files = []
-        failed_conversions = []
+        all_converted_files: List[Path] = []
+        failed_conversions: List[Path] = []
 
         for pdf_path in sorted(pdf_files):
             result = self.convert_pdf_to_markdown(pdf_path)
@@ -352,14 +362,14 @@ Total words: {len(all_words)}
 
 
 def convert_structured_directories(
-    input_dir, output_dir, file_type, enhanced_mode=False
-):
+    input_dir: str, output_dir: str, file_type: str, enhanced_mode: bool = False
+) -> List[Path]:
     """Convert PDFs from structured directories maintaining organization"""
-    converted_files = []
+    converted_files: List[Path] = []
     input_path = Path(input_dir)
 
     # Define subdirectory mappings
-    type_mapping = {"lab_reports": "lab", "imaging_reports": "imaging"}
+    type_mapping: Dict[str, str] = {"lab_reports": "lab", "imaging_reports": "imaging"}
 
     for subdir in input_path.iterdir():
         if not subdir.is_dir():

@@ -8,7 +8,7 @@ from ..core.utils import create_config_file
 
 
 @click.command()
-def config():
+def config() -> None:
     """
     Create a .env configuration file with default values and helpful comments.
 

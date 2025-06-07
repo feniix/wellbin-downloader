@@ -2,6 +2,8 @@
 Scrape command for downloading medical data from Wellbin platform.
 """
 
+from typing import Any, Dict, List, Optional
+
 import click
 from dotenv import load_dotenv
 
@@ -46,7 +48,15 @@ load_dotenv()
     is_flag=True,
     help="Show what would be downloaded without actually downloading",
 )
-def scrape(email, password, limit, types, output, headless, dry_run):
+def scrape(
+    email: Optional[str],
+    password: Optional[str],
+    limit: Optional[int],
+    types: Optional[str],
+    output: Optional[str],
+    headless: Optional[bool],
+    dry_run: bool,
+) -> None:
     """
     Download medical data from Wellbin platform.
 
@@ -76,25 +86,25 @@ def scrape(email, password, limit, types, output, headless, dry_run):
     """
 
     # PROPER PRECEDENCE: CLI args override env vars override defaults
-    final_email = (
+    final_email: str = (
         email
         if email is not None
         else get_env_default("WELLBIN_EMAIL", "your-email@example.com")
     )
-    final_password = (
+    final_password: str = (
         password
         if password is not None
         else get_env_default("WELLBIN_PASSWORD", "your-password")
     )
-    final_limit = (
+    final_limit: int = (
         limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
     )
-    final_types = (
+    final_types: str = (
         types
         if types is not None
         else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
     )
-    final_output = (
+    final_output: str = (
         output
         if output is not None
         else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
@@ -102,7 +112,7 @@ def scrape(email, password, limit, types, output, headless, dry_run):
 
     # For boolean flags: True/False if provided, otherwise check env var, otherwise default
     if headless is not None:
-        final_headless = headless
+        final_headless: bool = headless
     else:
         final_headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
 
@@ -120,15 +130,14 @@ def scrape(email, password, limit, types, output, headless, dry_run):
         study_types = [t.strip() for t in final_types.split(",")]
 
     # Convert limit
-    if final_limit == 0:
-        final_limit = None
+    final_limit_optional: Optional[int] = None if final_limit == 0 else final_limit
 
     # Display configuration
     click.echo("🚀 Wellbin Medical Data Downloader")
     click.echo("=" * 50)
     click.echo(f"📧 Email: {final_email}")
     click.echo(
-        f"🔢 Study limit: {final_limit if final_limit else 'No limit (all studies)'}"
+        f"🔢 Study limit: {final_limit_optional if final_limit_optional else 'No limit (all studies)'}"
     )
     click.echo(f"🎯 Study types: {', '.join(study_types)}")
     click.echo(f"📁 Output directory: {final_output}")
@@ -156,7 +165,7 @@ def scrape(email, password, limit, types, output, headless, dry_run):
         email=final_email,
         password=final_password,
         headless=final_headless,
-        limit_studies=final_limit,
+        limit_studies=final_limit_optional,
         study_types=study_types,
         output_dir=final_output,
     )
@@ -168,11 +177,12 @@ def scrape(email, password, limit, types, output, headless, dry_run):
     click.echo("🎉 DOWNLOAD COMPLETE!")
     click.echo("=" * 60)
 
+    # Group by study type for summary
+    by_type: Dict[str, List[Dict[str, Any]]] = {}
+
     if downloaded_files:
         click.echo(f"✅ Successfully downloaded {len(downloaded_files)} files:")
 
-        # Group by study type for summary
-        by_type = {}
         for file_info in downloaded_files:
             study_type = file_info["study_type"]
             if study_type not in by_type:
