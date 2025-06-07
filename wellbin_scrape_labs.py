@@ -786,7 +786,94 @@ def get_env_default(env_var, fallback, convert_type=None):
     return value
 
 
+def create_config_file():
+    """Create a .env configuration file with default values and helpful comments"""
+    import os
+    from pathlib import Path
+
+    env_file = Path(".env")
+
+    # Check if .env already exists
+    if env_file.exists():
+        click.echo("⚠️  .env file already exists!")
+        if not click.confirm("Do you want to overwrite it?"):
+            click.echo("❌ Configuration file creation cancelled.")
+            return
+
+    # Configuration content with defaults and comments
+    config_content = """# Wellbin Medical Data Scraper Configuration
+# Generated with --config-init option
+# Edit the values below to match your setup
+
+# =============================================================================
+# AUTHENTICATION - Required for Wellbin login
+# =============================================================================
+# Your Wellbin account email address
+WELLBIN_EMAIL=your-email@example.com
+
+# Your Wellbin account password
+WELLBIN_PASSWORD=your-password
+
+# =============================================================================
+# SCRAPER CONFIGURATION - Optional overrides (defaults are in source code)
+# =============================================================================
+
+# Output directory for downloaded medical files
+# Default: medical_data
+WELLBIN_OUTPUT_DIR=medical_data
+
+# Study download limit (0 = no limit, download all studies)
+# Options: 0 (all), or any positive integer (1, 5, 10, etc.)
+# Default: 0
+WELLBIN_STUDY_LIMIT=0
+
+# Study types to download
+# Options: FhirStudy (lab reports), DicomStudy (imaging), all (both types)
+# You can combine types with comma: FhirStudy,DicomStudy
+# Default: FhirStudy
+WELLBIN_STUDY_TYPES=FhirStudy
+
+# Run browser in headless mode (no visible browser window)
+# Options: true (headless), false (visible browser)
+# Default: true
+WELLBIN_HEADLESS=true
+"""
+
+    try:
+        # Write the configuration file
+        with open(env_file, "w") as f:
+            f.write(config_content)
+
+        click.echo("✅ Configuration file created successfully!")
+        click.echo(f"📁 Location: {env_file.absolute()}")
+        click.echo()
+        click.echo("🔧 Next steps:")
+        click.echo("1. Edit .env file with your Wellbin credentials:")
+        click.echo("   - Update WELLBIN_EMAIL with your email")
+        click.echo("   - Update WELLBIN_PASSWORD with your password")
+        click.echo()
+        click.echo("2. Optionally customize other settings:")
+        click.echo("   - WELLBIN_STUDY_TYPES: Choose what to download")
+        click.echo("   - WELLBIN_STUDY_LIMIT: Limit number of studies")
+        click.echo("   - WELLBIN_OUTPUT_DIR: Change output directory")
+        click.echo()
+        click.echo("3. Run the scraper:")
+        click.echo("   uv run python wellbin_scrape_labs.py")
+        click.echo()
+        click.echo(
+            "💡 All settings in .env can be overridden with command line options."
+        )
+
+    except Exception as e:
+        click.echo(f"❌ Error creating configuration file: {e}")
+
+
 @click.command()
+@click.option(
+    "--config-init",
+    is_flag=True,
+    help="Create a .env configuration file with default values and helpful comments",
+)
 @click.option(
     "--email", "-e", help="Email for Wellbin login (overrides WELLBIN_EMAIL env var)"
 )
@@ -820,7 +907,7 @@ def get_env_default(env_var, fallback, convert_type=None):
     is_flag=True,
     help="Show what would be downloaded without actually downloading",
 )
-def main(email, password, limit, types, output, headless, dry_run):
+def main(config_init, email, password, limit, types, output, headless, dry_run):
     """
     Wellbin Medical Data Scraper
 
@@ -834,6 +921,9 @@ def main(email, password, limit, types, output, headless, dry_run):
 
     Examples:
     \b
+        # Create configuration file with defaults
+        uv run python wellbin_scrape_labs.py --config-init
+
         # Download 5 lab reports
         uv run python wellbin_scrape_labs.py --limit 5 --types FhirStudy
 
@@ -849,6 +939,26 @@ def main(email, password, limit, types, output, headless, dry_run):
         # Dry run to see what would be downloaded
         uv run python wellbin_scrape_labs.py --dry-run --types DicomStudy
     """
+
+    # Handle --config-init option (exclusive from all other operations)
+    if config_init:
+        # Check if any other options were provided by examining sys.argv
+        import sys
+
+        args = sys.argv[1:]  # Skip script name
+
+        # Remove --config-init from args and check if anything else remains
+        config_args = ["--config-init"]
+        remaining_args = [arg for arg in args if arg not in config_args]
+
+        if remaining_args:
+            click.echo("❌ Error: --config-init cannot be used with other options.")
+            click.echo("   Use --config-init by itself to create a configuration file.")
+            click.echo(f"   Found additional arguments: {' '.join(remaining_args)}")
+            return
+
+        create_config_file()
+        return
 
     # PROPER PRECEDENCE: CLI args override env vars override defaults
     final_email = (
