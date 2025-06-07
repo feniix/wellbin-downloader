@@ -69,18 +69,18 @@ WELLBIN_EMAIL=your-email@example.com
 WELLBIN_PASSWORD=your-password
 
 # Default Directories
-DEFAULT_OUTPUT_DIR=medical_data
-DEFAULT_MARKDOWN_DIR=markdown_reports
+WELLBIN_OUTPUT_DIR=medical_data
+WELLBIN_MARKDOWN_DIR=markdown_reports
 
 # Scraper Settings
-DEFAULT_STUDY_LIMIT=
-DEFAULT_STUDY_TYPES=FhirStudy
-DEFAULT_HEADLESS=true
+WELLBIN_STUDY_LIMIT=
+WELLBIN_STUDY_TYPES=FhirStudy
+WELLBIN_HEADLESS=true
 
 # PDF Converter Settings
-DEFAULT_INPUT_DIR=medical_data
-DEFAULT_PRESERVE_STRUCTURE=true
-DEFAULT_FILE_TYPE=all
+WELLBIN_INPUT_DIR=medical_data
+WELLBIN_PRESERVE_STRUCTURE=true
+WELLBIN_FILE_TYPE=all
 ```
 
 ## 🚀 Usage

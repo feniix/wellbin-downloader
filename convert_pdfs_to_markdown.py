@@ -403,28 +403,28 @@ def get_env_or_default(env_var, default_value, convert_type=None):
 @click.option(
     "--input-dir",
     "-i",
-    help="Input directory containing PDF files (overrides DEFAULT_INPUT_DIR env var)",
+    help="Input directory containing PDF files (overrides WELLBIN_INPUT_DIR env var)",
 )
 @click.option(
     "--output-dir",
     "-o",
-    help="Output directory for markdown files (overrides DEFAULT_MARKDOWN_DIR env var)",
+    help="Output directory for markdown files (overrides WELLBIN_MARKDOWN_DIR env var)",
 )
 @click.option(
     "--preserve-structure",
     is_flag=True,
-    help="Preserve subdirectory structure from input (overrides DEFAULT_PRESERVE_STRUCTURE env var)",
+    help="Preserve subdirectory structure from input (overrides WELLBIN_PRESERVE_STRUCTURE env var)",
 )
 @click.option(
     "--file-type",
     "-t",
     type=click.Choice(["lab", "imaging", "all"]),
-    help="Type of medical files to convert (overrides DEFAULT_FILE_TYPE env var)",
+    help="Type of medical files to convert (overrides WELLBIN_FILE_TYPE env var)",
 )
 @click.option(
     "--enhanced-mode",
     is_flag=True,
-    help="Enable enhanced mode with page chunks, tables, and word positions (overrides DEFAULT_ENHANCED_MODE env var)",
+    help="Enable enhanced mode with page chunks, tables, and word positions (overrides WELLBIN_ENHANCED_MODE env var)",
 )
 def main(input_dir, output_dir, preserve_structure, file_type, enhanced_mode):
     """
@@ -438,7 +438,7 @@ def main(input_dir, output_dir, preserve_structure, file_type, enhanced_mode):
 
     ARGUMENT PRECEDENCE (highest to lowest):
     1. Command line arguments (--input-dir, --enhanced-mode, etc.)
-    2. Environment variables (DEFAULT_INPUT_DIR, DEFAULT_ENHANCED_MODE, etc.)
+    2. Environment variables (WELLBIN_INPUT_DIR, WELLBIN_ENHANCED_MODE, etc.)
     3. Built-in defaults
 
     Examples:
@@ -462,29 +462,29 @@ def main(input_dir, output_dir, preserve_structure, file_type, enhanced_mode):
     final_input_dir = (
         input_dir
         if input_dir is not None
-        else get_env_or_default("DEFAULT_INPUT_DIR", "medical_data")
+        else get_env_or_default("WELLBIN_INPUT_DIR", "medical_data")
     )
     final_output_dir = (
         output_dir
         if output_dir is not None
-        else get_env_or_default("DEFAULT_MARKDOWN_DIR", "markdown_reports")
+        else get_env_or_default("WELLBIN_MARKDOWN_DIR", "markdown_reports")
     )
     final_file_type = (
         file_type
         if file_type is not None
-        else get_env_or_default("DEFAULT_FILE_TYPE", "all")
+        else get_env_or_default("WELLBIN_FILE_TYPE", "all")
     )
 
     # For flags: True if flag is provided, otherwise check env var, otherwise False
     final_preserve_structure = (
         preserve_structure
         if preserve_structure
-        else get_env_or_default("DEFAULT_PRESERVE_STRUCTURE", "true", bool)
+        else get_env_or_default("WELLBIN_PRESERVE_STRUCTURE", "true", bool)
     )
     final_enhanced_mode = (
         enhanced_mode
         if enhanced_mode
-        else get_env_or_default("DEFAULT_ENHANCED_MODE", "false", bool)
+        else get_env_or_default("WELLBIN_ENHANCED_MODE", "false", bool)
     )
 
     click.echo("🔄 PDF to Markdown Converter for Medical Reports")

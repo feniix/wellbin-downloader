@@ -799,21 +799,21 @@ def get_env_default(env_var, fallback, convert_type=None):
     "--limit",
     "-l",
     type=int,
-    help="Limit number of studies to download, 0 = all (overrides DEFAULT_STUDY_LIMIT env var)",
+    help="Limit number of studies to download, 0 = all (overrides WELLBIN_STUDY_LIMIT env var)",
 )
 @click.option(
     "--types",
     "-t",
-    help='Study types to download: FhirStudy,DicomStudy or "all" (overrides DEFAULT_STUDY_TYPES env var)',
+    help='Study types to download: FhirStudy,DicomStudy or "all" (overrides WELLBIN_STUDY_TYPES env var)',
 )
 @click.option(
     "--output",
     "-o",
-    help="Output directory for downloaded files (overrides DEFAULT_OUTPUT_DIR env var)",
+    help="Output directory for downloaded files (overrides WELLBIN_OUTPUT_DIR env var)",
 )
 @click.option(
     "--headless/--no-headless",
-    help="Run browser in headless mode (overrides DEFAULT_HEADLESS env var)",
+    help="Run browser in headless mode (overrides WELLBIN_HEADLESS env var)",
 )
 @click.option(
     "--dry-run",
@@ -829,7 +829,7 @@ def main(email, password, limit, types, output, headless, dry_run):
 
     ARGUMENT PRECEDENCE (highest to lowest):
     1. Command line arguments (--email, --limit, --types, etc.)
-    2. Environment variables (WELLBIN_EMAIL, DEFAULT_STUDY_LIMIT, etc.)
+    2. Environment variables (WELLBIN_EMAIL, WELLBIN_STUDY_LIMIT, etc.)
     3. Built-in defaults
 
     Examples:
@@ -862,24 +862,24 @@ def main(email, password, limit, types, output, headless, dry_run):
         else get_env_default("WELLBIN_PASSWORD", "your-password")
     )
     final_limit = (
-        limit if limit is not None else get_env_default("DEFAULT_STUDY_LIMIT", "0", int)
+        limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
     )
     final_types = (
         types
         if types is not None
-        else get_env_default("DEFAULT_STUDY_TYPES", "FhirStudy")
+        else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
     )
     final_output = (
         output
         if output is not None
-        else get_env_default("DEFAULT_OUTPUT_DIR", "medical_data")
+        else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
     )
 
     # For boolean flags: True/False if provided, otherwise check env var, otherwise default
     if headless is not None:
         final_headless = headless
     else:
-        final_headless = get_env_default("DEFAULT_HEADLESS", "true", bool)
+        final_headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
 
     # Parse study types
     if final_types.lower() == "all":
