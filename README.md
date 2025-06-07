@@ -1,369 +1,281 @@
-# Wellbin Medical Data Scraper
+# Wellbin Medical Data Downloader
 
-A comprehensive Python scraper for the Wellbin medical platform (https://wellbin.co/) that downloads and processes medical data including laboratory reports and medical imaging studies.
+A comprehensive tool for downloading and processing medical data from the Wellbin platform. Supports both lab reports (FhirStudy) and medical imaging (DicomStudy) with PDF to Markdown conversion optimized for LLM consumption.
 
-## ✨ Features
+## Features
 
-### 🩺 **Medical Data Support**
-- **FhirStudy**: Laboratory reports (blood tests, chemistry panels, etc.)
-- **DicomStudy**: Medical imaging reports (MRI, CT, X-ray, ultrasound, etc.)
-- Automatic file categorization and organized storage
-- Date-based naming with deduplication
+- **Universal Medical Data Downloader**: Download lab reports and medical imaging from Wellbin
+- **Intelligent PDF Processing**: Convert medical PDFs to LLM-optimized markdown
+- **Enhanced Mode**: Page chunking, table detection, and word-level extraction
+- **Medical-Optimized Headers**: Automatic detection of medical report sections
+- **Flexible Configuration**: Environment variables + command-line arguments
+- **Structured Output**: Organized directories with proper categorization
 
-### 🛠️ **Professional CLI**
-- Built with `click` for robust command-line interface
-- Environment-based configuration for security
-- Flexible filtering and limiting options
-- Comprehensive help and examples
-
-### 📄 **PDF to Markdown Conversion**
-- LLM-optimized markdown extraction using PyMuPDF4LLM
-- Preserves medical data structure (tables, values, units)
-- Batch processing with type filtering
-- Perfect for AI/LLM analysis
-
-### 🔒 **Security & Configuration**
-- Environment variables for sensitive credentials
-- Configurable defaults via `.env` file
-- Git-safe with proper `.gitignore` setup
-
-## 🏗️ Requirements
-
-- Python 3.9+
-- Google Chrome browser
-- ChromeDriver (automatically managed by Selenium)
-- uv package manager
-
-## 📦 Installation
-
-1. Clone this repository:
-   ```bash
-   git clone <repository-url>
-   cd wellbin
-   ```
-
-2. Install dependencies:
-   ```bash
-   uv sync
-   ```
-
-3. Configure environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Wellbin credentials
-   ```
-
-## ⚙️ Configuration
-
-Create your `.env` file from the example:
+## Installation
 
 ```bash
-cp .env.example .env
+# Clone the repository
+git clone <repository-url>
+cd wellbin
+
+# Install with uv (recommended)
+uv sync
+
+# Or install in development mode
+uv pip install -e .
 ```
 
-Edit `.env` with your credentials:
+## Quick Start
+
+### 1. Create Configuration
+
+```bash
+# Generate .env configuration file with defaults
+uv run wellbin config
+```
+
+Edit the generated `.env` file with your Wellbin credentials:
 
 ```env
-# Wellbin Login Credentials
+WELLBIN_EMAIL=your-email@example.com
+WELLBIN_PASSWORD=your-password
+```
+
+### 2. Download Medical Data
+
+```bash
+# Download lab reports (default)
+uv run wellbin scrape
+
+# Download all types of studies
+uv run wellbin scrape --types all
+
+# Download with limits
+uv run wellbin scrape --limit 10 --types FhirStudy
+```
+
+### 3. Convert to Markdown
+
+```bash
+# Basic conversion
+uv run wellbin convert
+
+# Enhanced mode with advanced features
+uv run wellbin convert --enhanced-mode
+
+# Convert specific file types
+uv run wellbin convert --file-type lab --enhanced-mode
+```
+
+## Commands
+
+### `wellbin config`
+
+Create a comprehensive `.env` configuration file with detailed comments.
+
+```bash
+uv run wellbin config
+```
+
+### `wellbin scrape`
+
+Download medical data from Wellbin platform.
+
+```bash
+# Basic usage
+uv run wellbin scrape
+
+# With options
+uv run wellbin scrape --email user@example.com --password mypass --types all --limit 5
+
+# Available options:
+#   --email, -e          Email for login
+#   --password, -p       Password for login
+#   --limit, -l          Limit number of studies (0 = all)
+#   --types, -t          Study types: FhirStudy, DicomStudy, or "all"
+#   --output, -o         Output directory
+#   --headless/--no-headless  Browser mode
+#   --dry-run           Show what would be downloaded
+```
+
+### `wellbin convert`
+
+Convert medical PDFs to markdown format optimized for LLM consumption.
+
+```bash
+# Basic conversion
+uv run wellbin convert
+
+# Enhanced mode with advanced features
+uv run wellbin convert --enhanced-mode
+
+# Available options:
+#   --input-dir, -i      Input directory with PDFs
+#   --output-dir, -o     Output directory for markdown
+#   --file-type, -t      File type filter: lab, imaging, all
+#   --enhanced-mode      Enable advanced features
+#   --preserve-structure Maintain directory structure
+```
+
+## Configuration
+
+All commands support both environment variables and command-line arguments. Command-line arguments take precedence.
+
+### Environment Variables
+
+```env
+# Authentication (Required)
 WELLBIN_EMAIL=your-email@example.com
 WELLBIN_PASSWORD=your-password
 
-# Default Directories
+# Downloader Configuration
 WELLBIN_OUTPUT_DIR=medical_data
-WELLBIN_MARKDOWN_DIR=markdown_reports
-
-# Scraper Settings
-WELLBIN_STUDY_LIMIT=
+WELLBIN_STUDY_LIMIT=0
 WELLBIN_STUDY_TYPES=FhirStudy
 WELLBIN_HEADLESS=true
 
-# PDF Converter Settings
+# Converter Configuration
 WELLBIN_INPUT_DIR=medical_data
+WELLBIN_MARKDOWN_DIR=markdown_reports
 WELLBIN_PRESERVE_STRUCTURE=true
 WELLBIN_FILE_TYPE=all
+WELLBIN_ENHANCED_MODE=false
 ```
 
-## 🚀 Usage
+## Enhanced Mode Features
 
-### Medical Data Scraper
+When using `--enhanced-mode` for PDF conversion:
 
-#### **Download Lab Reports (FhirStudy)**
-```bash
-# Download 5 recent lab reports
-uv run python wellbin_scrape_labs.py --limit 5 --types FhirStudy
+- **Page Chunks**: Each page embedded as a section in single markdown files
+- **Table Detection**: Automatic table recognition with position metadata
+- **Word Positions**: Word-level extraction with coordinates (hidden in footer)
+- **Medical Headers**: Optimized detection of medical report sections
+- **Text-Only Processing**: Images disabled for faster, focused extraction
 
-# Download all lab reports
-uv run python wellbin_scrape_labs.py --limit 0 --types FhirStudy
-```
+## Output Structure
 
-#### **Download Imaging Reports (DicomStudy)**
-```bash
-# Download 10 imaging studies
-uv run python wellbin_scrape_labs.py --limit 10 --types DicomStudy
-
-# Download all imaging studies
-uv run python wellbin_scrape_labs.py --limit 0 --types DicomStudy
-```
-
-#### **Download Everything**
-```bash
-# Download both lab and imaging studies
-uv run python wellbin_scrape_labs.py --types FhirStudy,DicomStudy
-
-# Download all study types
-uv run python wellbin_scrape_labs.py --types all
-```
-
-#### **Custom Configuration**
-```bash
-# Custom output directory
-uv run python wellbin_scrape_labs.py --output my_medical_data --types DicomStudy
-
-# Visible browser (for debugging)
-uv run python wellbin_scrape_labs.py --no-headless --limit 1
-```
-
-### PDF to Markdown Converter
-
-#### **Convert Medical Data**
-```bash
-# Convert all PDFs using environment defaults
-uv run python convert_pdfs_to_markdown.py
-
-# Convert organized medical data preserving structure
-uv run python convert_pdfs_to_markdown.py --input-dir medical_data --preserve-structure
-
-# Convert only lab reports
-uv run python convert_pdfs_to_markdown.py --file-type lab
-
-# Convert only imaging reports
-uv run python convert_pdfs_to_markdown.py --file-type imaging
-```
-
-### CLI Help
-
-Get comprehensive help for any command:
-
-```bash
-uv run python wellbin_scrape_labs.py --help
-uv run python convert_pdfs_to_markdown.py --help
-```
-
-## 📁 File Organization
-
-The scraper automatically organizes files by type:
-
+### Downloaded Files
 ```
 medical_data/
 ├── lab_reports/
-│   ├── 20250604-lab-0.pdf      # Latest lab results
-│   ├── 20250210-lab-0.pdf      # Blood chemistry panel
-│   └── 20190119-lab-0.pdf      # Historical lab data
-└── imaging_reports/
-    ├── 20250416-imaging-0.pdf  # MRI report
-    ├── 20250318-imaging-0.pdf  # CT scan report
-    └── 20250314-imaging-0.pdf  # X-ray report
-
-markdown_reports/
-├── lab_reports_markdown/
-│   ├── 20250604-lab-0.md       # LLM-ready lab data
+│   ├── 20240604-lab-0.pdf
+│   ├── 20240605-lab-0.pdf
 │   └── ...
-└── imaging_reports_markdown/
-    ├── 20250416-imaging-0.md   # LLM-ready imaging reports
+└── imaging_reports/
+    ├── 20240604-imaging-0.pdf
+    ├── 20240605-imaging-0.pdf
     └── ...
 ```
 
-## 🤖 LLM Integration
-
-The markdown converter creates LLM-optimized output perfect for AI analysis:
-
-```bash
-# Feed all medical data to an LLM
-cat markdown_reports/**/*.md | llm "analyze my health trends over time"
-
-# Extract specific medical values
-grep -h 'mg/dL\|g/dL' markdown_reports/**/*.md
-
-# Find abnormal results
-grep -i 'alto\|bajo\|high\|low' markdown_reports/**/*.md
-
-# Search across all reports
-grep -r 'cholesterol\|glucose' markdown_reports/
+### Converted Markdown
+```
+markdown_reports/
+├── lab_reports_markdown/
+│   ├── 20240604-lab-0.md
+│   ├── 20240605-lab-0.md
+│   └── ...
+└── imaging_reports_markdown/
+    ├── 20240604-imaging-0.md
+    ├── 20240605-imaging-0.md
+    └── ...
 ```
 
-## 🏥 Medical Data Types
+## LLM Usage Examples
 
-### **FhirStudy (Laboratory Reports)**
-- Blood chemistry panels
-- Complete blood count (CBC)
-- Lipid profiles
-- Liver function tests
-- Kidney function tests
-- Hormone levels
-- Tumor markers
+After conversion, use the markdown files with LLMs:
 
-### **DicomStudy (Medical Imaging)**
-- MRI (Magnetic Resonance Imaging)
-- CT (Computed Tomography) scans
-- X-rays
-- Ultrasounds
-- Mammograms
-- Nuclear medicine studies
+```bash
+# Read a specific report
+cat markdown_reports/lab_reports_markdown/20240604-lab-0.md
 
-## 🔧 Development
+# Search across all reports
+grep -r "keyword" markdown_reports/
 
-### Project Structure
+# Count total reports
+find markdown_reports -name "*.md" | wc -l
+
+# Feed to LLM for analysis
+cat markdown_reports/**/*.md | llm "analyze trends in lab values"
+
+# Extract specific lab values
+grep -h "mg/dL\|g/dL" markdown_reports/**/*.md
+
+# Find abnormal values
+grep -i "alto\|bajo\|high\|low" markdown_reports/**/*.md
+```
+
+## Development
+
+### Package Structure
 
 ```
 wellbin/
-├── wellbin_scrape_labs.py      # Main medical data scraper
-├── convert_pdfs_to_markdown.py # PDF to markdown converter
-├── pyproject.toml              # Project dependencies
-├── .env.example               # Environment template
-├── .env                       # Your credentials (gitignored)
-├── .gitignore                # Git exclusions
-├── CONFIG.md                 # Configuration guide
-└── README.md                 # This file
+├── __init__.py              # Package initialization
+├── cli.py                   # Main CLI entry point
+├── core/                    # Core functionality
+│   ├── __init__.py
+│   ├── scraper.py          # WellbinMedicalScraper class
+│   ├── converter.py        # PDFToMarkdownConverter class
+│   └── utils.py            # Utility functions
+└── commands/               # CLI commands
+    ├── __init__.py
+    ├── config.py           # Configuration command
+    ├── scrape.py           # Scraping command
+    └── convert.py          # Conversion command
 ```
 
-### Adding New Study Types
-
-To support additional medical data types, update the `study_config` in `WellbinMedicalScraper`:
-
-```python
-self.study_config = {
-    'FhirStudy': {
-        'name': 'lab',
-        'description': 'Laboratory Reports',
-        'icon': '🧪',
-        'subdir': 'lab_reports'
-    },
-    'DicomStudy': {
-        'name': 'imaging',
-        'description': 'Medical Imaging',
-        'icon': '🩻',
-        'subdir': 'imaging_reports'
-    },
-    'NewStudyType': {
-        'name': 'new_type',
-        'description': 'New Medical Data',
-        'icon': '📋',
-        'subdir': 'new_reports'
-    }
-}
-```
-
-## 🛡️ Security & Privacy
-
-### **Credential Security**
-- ✅ Credentials stored in `.env` file (gitignored)
-- ✅ No hardcoded passwords in source code
-- ✅ Environment-based configuration
-
-### **Medical Data Privacy**
-- ✅ All medical data directories gitignored
-- ✅ Local processing only
-- ✅ No data transmitted to external services
-- ⚠️ **Important**: This contains your personal medical data - handle with care
-
-### **Safe Usage**
-- Only access your own medical data
-- Respect Wellbin's terms of service
-- Use reasonable rate limiting
-- Store downloaded data securely
-
-## 🐛 Troubleshooting
-
-### **Common Issues**
-
-1. **Login Fails**
-   ```bash
-   # Check credentials in .env file
-   cat .env
-
-   # Test with visible browser
-   uv run python wellbin_scrape_labs.py --no-headless --limit 1
-   ```
-
-2. **No Studies Found**
-   ```bash
-   # Verify study types available
-   uv run python wellbin_scrape_labs.py --types all --limit 1
-   ```
-
-3. **Environment Issues**
-   ```bash
-   # Verify environment loading
-   uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(os.getenv('WELLBIN_EMAIL'))"
-   ```
-
-4. **ChromeDriver Problems**
-   - Ensure Google Chrome is installed
-   - Selenium 4+ manages ChromeDriver automatically
-   - Check for browser version compatibility
-
-### **Debug Mode**
-
-Enable verbose debugging:
+### Running Tests
 
 ```bash
-# Run with visible browser
-uv run python wellbin_scrape_labs.py --no-headless
+# Install development dependencies
+uv sync --dev
 
-# Limit to 1 study for testing
-uv run python wellbin_scrape_labs.py --limit 1 --types FhirStudy
+# Run linting
+uv run flake8 wellbin/
+uv run black --check wellbin/
+uv run isort --check-only wellbin/
+
+# Run type checking
+uv run mypy wellbin/
 ```
 
-## 📊 Examples
+## Migration from Old Scripts
 
-### **Complete Medical History Download**
+If you were using the old standalone scripts:
 
 ```bash
-# 1. Download all medical data
-uv run python wellbin_scrape_labs.py --types all --output complete_medical_history
+# Old way
+uv run python wellbin_scrape_labs.py --config-init
+uv run python wellbin_scrape_labs.py --email user@example.com --types all
+uv run python convert_pdfs_to_markdown.py --enhanced-mode
 
-# 2. Convert to LLM-ready markdown
-uv run python convert_pdfs_to_markdown.py \
-  --input-dir complete_medical_history \
-  --preserve-structure \
-  --output-dir medical_analysis
-
-# 3. Analyze with AI
-cat medical_analysis/**/*.md | llm "Summarize my medical history and identify any concerning trends"
+# New way
+uv run wellbin config
+uv run wellbin scrape --email user@example.com --types all
+uv run wellbin convert --enhanced-mode
 ```
 
-### **Monitoring Recent Results**
+## Requirements
 
-```bash
-# Download latest 5 lab reports
-uv run python wellbin_scrape_labs.py --limit 5 --types FhirStudy
+- Python 3.9+
+- Chrome/Chromium browser (for Selenium)
+- ChromeDriver (automatically managed by Selenium)
 
-# Convert and analyze recent trends
-uv run python convert_pdfs_to_markdown.py --file-type lab
-grep -h "glucose\|cholesterol" markdown_reports/**/*.md
-```
+## License
 
-## 🤝 Contributing
+MIT License - see LICENSE file for details.
+
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
-## 📄 License
+## Support
 
-This project is for educational and personal medical data management. Please:
-- Respect Wellbin's terms of service
-- Only access your own medical data
-- Use responsibly and ethically
-- Comply with applicable privacy laws (HIPAA, GDPR, etc.)
-
-## 🔗 Dependencies
-
-- **Click**: Professional CLI interface
-- **Selenium**: Web automation
-- **Requests**: HTTP client
-- **BeautifulSoup4**: HTML parsing
-- **PyMuPDF4LLM**: LLM-optimized PDF processing
-- **python-dotenv**: Environment configuration
+For issues and questions:
+- Create an issue on GitHub
+- Check the configuration with `uv run wellbin config`
+- Verify credentials and network connectivity

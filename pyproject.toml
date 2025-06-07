@@ -1,8 +1,8 @@
 [project]
-name = "wellbin-scraper"
+name = "wellbin-downloader"
 version = "0.1.0"
-description = "A web scraper for Wellbin medical data platform"
-authors = [{name = "User", email = "feniix@gmail.com"}]
+description = "A comprehensive tool for downloading and processing medical data from the Wellbin platform"
+authors = [{name = "feniix", email = "feniix@gmail.com"}]
 requires-python = ">=3.9"
 dependencies = [
     "requests>=2.31.0",
@@ -13,15 +13,37 @@ dependencies = [
     "pymupdf4llm>=0.0.5",
     "click>=8.0.0",
 ]
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["medical", "downloader", "wellbin", "pdf", "markdown", "healthcare"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.scripts]
+wellbin = "wellbin.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/feniix/wellbin-downloader"
+Repository = "https://github.com/feniix/wellbin-downloader"
+Issues = "https://github.com/feniix/wellbin-downloader/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-include = [
-    "*.py",
-]
+packages = ["wellbin"]
 
 [tool.uv]
 dev-dependencies = [
@@ -54,7 +76,7 @@ extend-exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 88
-known_first_party = ["wellbin-scraper"]
+known_first_party = ["wellbin"]
 
 [tool.flake8]
 max-line-length = 88

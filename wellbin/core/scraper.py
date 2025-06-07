@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 """
-Wellbin Medical Data Scraper
-Universal scraper for downloading medical data from Wellbin platform
-Supports FhirStudy (lab reports) and DicomStudy (imaging reports) with proper categorization
+Wellbin Medical Data Downloader Core Module
+
+Contains the main WellbinMedicalDownloader class for downloading medical data
+from the Wellbin platform with support for FhirStudy and DicomStudy types.
 """
 
 import os
@@ -11,20 +11,15 @@ import time
 from collections import defaultdict
 from datetime import datetime
 
-import click
 import requests
-from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
-# Load environment variables
-load_dotenv()
 
-
-class WellbinMedicalScraper:
+class WellbinMedicalDownloader:
     def __init__(
         self,
         email,
@@ -703,7 +698,7 @@ class WellbinMedicalScraper:
             return None
 
     def scrape_studies(self):
-        """Main method to scrape studies and download PDFs"""
+        """Main method to download studies and download PDFs"""
         downloaded_files = []
 
         try:
@@ -762,7 +757,7 @@ class WellbinMedicalScraper:
             return downloaded_files
 
         except Exception as e:
-            print(f"❌ Error during scraping: {e}")
+            print(f"❌ Error during download: {e}")
             import traceback
 
             print(f"🔍 Traceback: {traceback.format_exc()}")
@@ -771,320 +766,3 @@ class WellbinMedicalScraper:
             if self.driver:
                 print("🔒 Closing browser...")
                 self.driver.quit()
-
-
-def get_env_default(env_var, fallback, convert_type=None):
-    """Helper to get environment variable with proper empty value handling"""
-    value = os.getenv(env_var, "").strip()
-    if not value:
-        value = fallback
-
-    if convert_type == int:
-        return int(value)
-    elif convert_type == bool:
-        return value.lower() in ("true", "1", "yes", "on")
-    return value
-
-
-def create_config_file():
-    """Create a .env configuration file with default values and helpful comments"""
-    import os
-    from pathlib import Path
-
-    env_file = Path(".env")
-
-    # Check if .env already exists
-    if env_file.exists():
-        click.echo("⚠️  .env file already exists!")
-        if not click.confirm("Do you want to overwrite it?"):
-            click.echo("❌ Configuration file creation cancelled.")
-            return
-
-    # Configuration content with defaults and comments
-    config_content = """# Wellbin Medical Data Scraper Configuration
-# Generated with --config-init option
-# Edit the values below to match your setup
-
-# =============================================================================
-# AUTHENTICATION - Required for Wellbin login
-# =============================================================================
-# Your Wellbin account email address
-WELLBIN_EMAIL=your-email@example.com
-
-# Your Wellbin account password
-WELLBIN_PASSWORD=your-password
-
-# =============================================================================
-# SCRAPER CONFIGURATION - Optional overrides (defaults are in source code)
-# =============================================================================
-
-# Output directory for downloaded medical files
-# Default: medical_data
-WELLBIN_OUTPUT_DIR=medical_data
-
-# Study download limit (0 = no limit, download all studies)
-# Options: 0 (all), or any positive integer (1, 5, 10, etc.)
-# Default: 0
-WELLBIN_STUDY_LIMIT=0
-
-# Study types to download
-# Options: FhirStudy (lab reports), DicomStudy (imaging), all (both types)
-# You can combine types with comma: FhirStudy,DicomStudy
-# Default: FhirStudy
-WELLBIN_STUDY_TYPES=FhirStudy
-
-# Run browser in headless mode (no visible browser window)
-# Options: true (headless), false (visible browser)
-# Default: true
-WELLBIN_HEADLESS=true
-"""
-
-    try:
-        # Write the configuration file
-        with open(env_file, "w") as f:
-            f.write(config_content)
-
-        click.echo("✅ Configuration file created successfully!")
-        click.echo(f"📁 Location: {env_file.absolute()}")
-        click.echo()
-        click.echo("🔧 Next steps:")
-        click.echo("1. Edit .env file with your Wellbin credentials:")
-        click.echo("   - Update WELLBIN_EMAIL with your email")
-        click.echo("   - Update WELLBIN_PASSWORD with your password")
-        click.echo()
-        click.echo("2. Optionally customize other settings:")
-        click.echo("   - WELLBIN_STUDY_TYPES: Choose what to download")
-        click.echo("   - WELLBIN_STUDY_LIMIT: Limit number of studies")
-        click.echo("   - WELLBIN_OUTPUT_DIR: Change output directory")
-        click.echo()
-        click.echo("3. Run the scraper:")
-        click.echo("   uv run python wellbin_scrape_labs.py")
-        click.echo()
-        click.echo(
-            "💡 All settings in .env can be overridden with command line options."
-        )
-
-    except Exception as e:
-        click.echo(f"❌ Error creating configuration file: {e}")
-
-
-@click.command()
-@click.option(
-    "--config-init",
-    is_flag=True,
-    help="Create a .env configuration file with default values and helpful comments",
-)
-@click.option(
-    "--email", "-e", help="Email for Wellbin login (overrides WELLBIN_EMAIL env var)"
-)
-@click.option(
-    "--password",
-    "-p",
-    help="Password for Wellbin login (overrides WELLBIN_PASSWORD env var)",
-)
-@click.option(
-    "--limit",
-    "-l",
-    type=int,
-    help="Limit number of studies to download, 0 = all (overrides WELLBIN_STUDY_LIMIT env var)",
-)
-@click.option(
-    "--types",
-    "-t",
-    help='Study types to download: FhirStudy,DicomStudy or "all" (overrides WELLBIN_STUDY_TYPES env var)',
-)
-@click.option(
-    "--output",
-    "-o",
-    help="Output directory for downloaded files (overrides WELLBIN_OUTPUT_DIR env var)",
-)
-@click.option(
-    "--headless/--no-headless",
-    help="Run browser in headless mode (overrides WELLBIN_HEADLESS env var)",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show what would be downloaded without actually downloading",
-)
-def main(config_init, email, password, limit, types, output, headless, dry_run):
-    """
-    Wellbin Medical Data Scraper
-
-    Universal scraper for downloading medical data from Wellbin platform.
-    Supports FhirStudy (lab reports) and DicomStudy (imaging reports) with proper categorization.
-
-    ARGUMENT PRECEDENCE (highest to lowest):
-    1. Command line arguments (--email, --limit, --types, etc.)
-    2. Environment variables (WELLBIN_EMAIL, WELLBIN_STUDY_LIMIT, etc.)
-    3. Built-in defaults
-
-    Examples:
-    \b
-        # Create configuration file with defaults
-        uv run python wellbin_scrape_labs.py --config-init
-
-        # Download 5 lab reports
-        uv run python wellbin_scrape_labs.py --limit 5 --types FhirStudy
-
-        # Download all imaging studies
-        uv run python wellbin_scrape_labs.py --limit 0 --types DicomStudy
-
-        # Download both lab and imaging studies
-        uv run python wellbin_scrape_labs.py --types FhirStudy,DicomStudy
-
-        # Download everything
-        uv run python wellbin_scrape_labs.py --types all
-
-        # Dry run to see what would be downloaded
-        uv run python wellbin_scrape_labs.py --dry-run --types DicomStudy
-    """
-
-    # Handle --config-init option (exclusive from all other operations)
-    if config_init:
-        # Check if any other options were provided by examining sys.argv
-        import sys
-
-        args = sys.argv[1:]  # Skip script name
-
-        # Remove --config-init from args and check if anything else remains
-        config_args = ["--config-init"]
-        remaining_args = [arg for arg in args if arg not in config_args]
-
-        if remaining_args:
-            click.echo("❌ Error: --config-init cannot be used with other options.")
-            click.echo("   Use --config-init by itself to create a configuration file.")
-            click.echo(f"   Found additional arguments: {' '.join(remaining_args)}")
-            return
-
-        create_config_file()
-        return
-
-    # PROPER PRECEDENCE: CLI args override env vars override defaults
-    final_email = (
-        email
-        if email is not None
-        else get_env_default("WELLBIN_EMAIL", "your-email@example.com")
-    )
-    final_password = (
-        password
-        if password is not None
-        else get_env_default("WELLBIN_PASSWORD", "your-password")
-    )
-    final_limit = (
-        limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
-    )
-    final_types = (
-        types
-        if types is not None
-        else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
-    )
-    final_output = (
-        output
-        if output is not None
-        else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
-    )
-
-    # For boolean flags: True/False if provided, otherwise check env var, otherwise default
-    if headless is not None:
-        final_headless = headless
-    else:
-        final_headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
-
-    # Parse study types
-    if final_types.lower() == "all":
-        study_types = ["all"]
-    else:
-        study_types = [t.strip() for t in final_types.split(",")]
-
-    # Convert limit
-    if final_limit == 0:
-        final_limit = None
-
-    # Display configuration
-    click.echo("🚀 Wellbin Medical Data Scraper")
-    click.echo("=" * 50)
-    click.echo(f"📧 Email: {final_email}")
-    click.echo(
-        f"🔢 Study limit: {final_limit if final_limit else 'No limit (all studies)'}"
-    )
-    click.echo(f"🎯 Study types: {', '.join(study_types)}")
-    click.echo(f"📁 Output directory: {final_output}")
-    click.echo(f"🤖 Headless mode: {final_headless}")
-    if dry_run:
-        click.echo("🔍 DRY RUN MODE: Will not download files")
-
-    # Show precedence information
-    click.echo("\n🔧 Argument Sources:")
-    click.echo(f"   Email: {'CLI' if email else 'ENV/Default'}")
-    click.echo(f"   Password: {'CLI' if password else 'ENV/Default'}")
-    click.echo(f"   Limit: {'CLI' if limit is not None else 'ENV/Default'}")
-    click.echo(f"   Types: {'CLI' if types else 'ENV/Default'}")
-    click.echo(f"   Output: {'CLI' if output else 'ENV/Default'}")
-    click.echo(f"   Headless: {'CLI' if headless is not None else 'ENV/Default'}")
-    click.echo("=" * 50)
-
-    if dry_run:
-        click.echo("\n⚠️  This is a dry run. No files will be downloaded.")
-        click.echo("Remove --dry-run flag to actually download files.")
-
-    # Create and run scraper
-    scraper = WellbinMedicalScraper(
-        email=final_email,
-        password=final_password,
-        headless=final_headless,
-        limit_studies=final_limit,
-        study_types=study_types,
-        output_dir=final_output,
-    )
-
-    if dry_run:
-        # For dry run, we'd need to implement a dry run mode in the scraper
-        click.echo("\n🔍 DRY RUN: Not implemented yet. Remove --dry-run to download.")
-        return
-
-    downloaded_files = scraper.scrape_studies()
-
-    # Summary
-    click.echo("\n" + "=" * 60)
-    click.echo("🎉 SCRAPING COMPLETE!")
-    click.echo("=" * 60)
-
-    if downloaded_files:
-        click.echo(f"✅ Successfully downloaded {len(downloaded_files)} files:")
-
-        # Group by study type for summary
-        by_type = {}
-        for file_info in downloaded_files:
-            study_type = file_info["study_type"]
-            if study_type not in by_type:
-                by_type[study_type] = []
-            by_type[study_type].append(file_info)
-
-        for study_type, files in by_type.items():
-            config = scraper.study_config.get(
-                study_type, {"icon": "📄", "description": study_type}
-            )
-            click.echo(
-                f"\n{config['icon']} {config['description']} ({len(files)} files):"
-            )
-            for i, file_info in enumerate(files, 1):
-                click.echo(f"  {i}. 📄 {file_info['local_path']}")
-                click.echo(f"     📅 Study date: {file_info['study_date']}")
-                click.echo(f"     📝 Description: {file_info['description']}")
-    else:
-        click.echo("❌ No files were downloaded")
-
-    # Show organized directory structure
-    if downloaded_files:
-        click.echo(f"\n📁 Files organized in {final_output}/:")
-        for study_type in by_type.keys():
-            config = scraper.study_config.get(
-                study_type, {"subdir": "unknown", "icon": "📄"}
-            )
-            file_count = len(by_type[study_type])
-            click.echo(f"  {config['icon']} {config['subdir']}/  ({file_count} files)")
-
-
-if __name__ == "__main__":
-    main()
