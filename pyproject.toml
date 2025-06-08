@@ -92,6 +92,8 @@ exclude = [
     "build",
     "dist",
 ]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.9"
 pythonPlatform = "All"
 typeCheckingMode = "strict"

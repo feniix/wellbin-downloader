@@ -20,7 +20,9 @@ def get_env_default(
     if convert_type == int:
         return int(value)
     elif convert_type == bool:
-        return value.lower() in ("true", "1", "yes", "on")
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ("true", "1", "yes", "on")
     return value
 
 

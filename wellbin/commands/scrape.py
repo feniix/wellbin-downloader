@@ -41,6 +41,7 @@ load_dotenv()
 )
 @click.option(
     "--headless/--no-headless",
+    default=None,
     help="Run browser in headless mode (overrides WELLBIN_HEADLESS env var)",
 )
 @click.option(

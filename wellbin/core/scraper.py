@@ -536,10 +536,8 @@ class WellbinMedicalDownloader:
                 )
                 study_links = study_links[: self.limit_studies]
 
-            # Extract dates for the filtered studies
-            if study_links:
-                print("📅 Extracting dates for filtered studies...")
-                self.extract_dates_for_studies(study_links)
+            # Note: Dates will be extracted when processing individual study pages
+            # since they're not available on the explorer page
 
             return study_links
 

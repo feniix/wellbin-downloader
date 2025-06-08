@@ -1,9 +1,6 @@
 # Medical data directories (sensitive)
-medical_data/
-medical_markdown/
-medical_markdown_filtered/
-downloads/
-markdown_reports/
+medical_data_source
+medical_data_markdown/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
