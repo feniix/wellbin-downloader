@@ -47,7 +47,7 @@ alwaysApply: true
 ## Examples of Correct Commands:
 ```bash
 # Running the main application
-uv run python run_server.py
+uv run python <script_name>
 
 # Running tests
 uv run pytest tests/
@@ -65,7 +65,7 @@ uv run pytest tests/test_example.py
 uv run python -m http.server 8000
 
 # Running development server
-uv run python -m flask run --host=0.0.0.0 --port=5000
+uv run python -m flask run --host=0.0.0.0 --port=8000
 ```
 
 ## What NOT to do:

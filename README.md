@@ -121,24 +121,18 @@ uv run wellbin convert --enhanced-mode
 
 All commands support both environment variables and command-line arguments. Command-line arguments take precedence.
 
-### Environment Variables
+For detailed configuration options, see [CONFIG.md](CONFIG.md).
+
+### Quick Configuration
 
 ```env
 # Authentication (Required)
 WELLBIN_EMAIL=your-email@example.com
 WELLBIN_PASSWORD=your-password
 
-# Downloader Configuration
+# Basic settings
 WELLBIN_OUTPUT_DIR=medical_data
-WELLBIN_STUDY_LIMIT=0
 WELLBIN_STUDY_TYPES=FhirStudy
-WELLBIN_HEADLESS=true
-
-# Converter Configuration
-WELLBIN_INPUT_DIR=medical_data
-WELLBIN_MARKDOWN_DIR=markdown_reports
-WELLBIN_PRESERVE_STRUCTURE=true
-WELLBIN_FILE_TYPE=all
 WELLBIN_ENHANCED_MODE=false
 ```
 
@@ -204,74 +198,20 @@ grep -h "mg/dL\|g/dL" markdown_reports/**/*.md
 grep -i "alto\|bajo\|high\|low" markdown_reports/**/*.md
 ```
 
-## Development
-
-### Package Structure
-
-```
-wellbin/
-├── __init__.py              # Package initialization
-├── cli.py                   # Main CLI entry point
-├── core/                    # Core functionality
-│   ├── __init__.py
-│   ├── scraper.py          # WellbinMedicalScraper class
-│   ├── converter.py        # PDFToMarkdownConverter class
-│   └── utils.py            # Utility functions
-└── commands/               # CLI commands
-    ├── __init__.py
-    ├── config.py           # Configuration command
-    ├── scrape.py           # Scraping command
-    └── convert.py          # Conversion command
-```
-
-### Running Tests
-
-```bash
-# Install development dependencies
-uv sync --dev
-
-# Run linting
-uv run flake8 wellbin/
-uv run black --check wellbin/
-uv run isort --check-only wellbin/
-
-# Run type checking
-uv run mypy wellbin/
-```
-
-## Migration from Old Scripts
-
-If you were using the old standalone scripts:
-
-```bash
-# Old way
-uv run python wellbin_scrape_labs.py --config-init
-uv run python wellbin_scrape_labs.py --email user@example.com --types all
-uv run python convert_pdfs_to_markdown.py --enhanced-mode
-
-# New way
-uv run wellbin config
-uv run wellbin scrape --email user@example.com --types all
-uv run wellbin convert --enhanced-mode
-```
-
 ## Requirements
 
 - Python 3.9+
 - Chrome/Chromium browser (for Selenium)
 - ChromeDriver (automatically managed by Selenium)
 
+## Documentation
+
+- [Configuration Guide](CONFIG.md) - Detailed configuration options
+- [Development Guide](DEVELOPMENT.md) - Development setup and contributing
+
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
 
 ## Support
 
