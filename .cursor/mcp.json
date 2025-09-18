@@ -1,0 +1,68 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "fast-filesystem-mcp@3.3.3",
+        "/Users/feniix/src/personal/cursor/wellbin"
+      ]
+    },
+    "web-search": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@dannyboy2042/freebird-mcp@1.5.1"
+      ]
+    },
+    "sequential-thinking": {
+      "type": "sse",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking@2025.7.1"
+      ]
+    },
+    "mcp-fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-fetch"
+      ]
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp"
+      ]
+    },
+    "context7": {
+      "type": "sse",
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@1.0.17"
+      ]
+    },
+    "basic-memory": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "basic-memory",
+        "mcp"
+      ]
+    },
+    "mcp-pandoc": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-pandoc"
+      ]
+    }
+  }
+}
