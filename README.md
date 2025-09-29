@@ -149,7 +149,8 @@ When using `--enhanced-mode` for PDF conversion:
 ## Output Structure
 
 ### Downloaded Files
-```
+
+```text
 medical_data/
 ├── lab_reports/
 │   ├── 20240604-lab-0.pdf
@@ -162,7 +163,8 @@ medical_data/
 ```
 
 ### Converted Markdown
-```
+
+```text
 markdown_reports/
 ├── lab_reports_markdown/
 │   ├── 20240604-lab-0.md
@@ -216,6 +218,7 @@ MIT License - see LICENSE file for details.
 ## Support
 
 For issues and questions:
+
 - Create an issue on GitHub
 - Check the configuration with `uv run wellbin config`
 - Verify credentials and network connectivity

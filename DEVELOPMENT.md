@@ -27,7 +27,7 @@ uv pip install -e .
 
 ## Package Structure
 
-```
+```text
 wellbin/
 ├── __init__.py              # Package initialization
 ├── cli.py                   # Main CLI entry point
@@ -128,6 +128,7 @@ uv run wellbin convert --enhanced-mode
 ### Commit Messages
 
 Use conventional commit format:
+
 - `feat:` for new features
 - `fix:` for bug fixes
 - `docs:` for documentation changes
@@ -163,18 +164,21 @@ Use conventional commit format:
 ### Common Development Issues
 
 1. **Selenium WebDriver Issues**
+
    ```bash
    # Update ChromeDriver
    uv run python -c "from selenium import webdriver; webdriver.Chrome()"
    ```
 
 2. **PDF Processing Issues**
+
    ```bash
    # Test with single file
    uv run wellbin convert --input-dir test_pdfs --file-type lab
    ```
 
 3. **Authentication Issues**
+
    ```bash
    # Test credentials
    uv run wellbin scrape --dry-run --email test@example.com
@@ -183,6 +187,7 @@ Use conventional commit format:
 ### Debug Mode
 
 Enable detailed logging:
+
 ```bash
 export WELLBIN_DEBUG=true
 uv run wellbin scrape

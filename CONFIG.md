@@ -5,6 +5,7 @@ This document provides comprehensive configuration options for the Wellbin Medic
 ## Quick Setup
 
 1. Generate a configuration file with defaults:
+
    ```bash
    uv run wellbin config
    ```
@@ -14,6 +15,7 @@ This document provides comprehensive configuration options for the Wellbin Medic
 ## Configuration Methods
 
 The application supports configuration through:
+
 1. **Environment variables** (`.env` file or system environment)
 2. **Command-line arguments** (take precedence over environment variables)
 
@@ -93,6 +95,7 @@ uv run wellbin convert \
 ## Configuration Examples
 
 ### Basic Lab Reports Only
+
 ```env
 WELLBIN_EMAIL=user@example.com
 WELLBIN_PASSWORD=mypassword
@@ -102,6 +105,7 @@ WELLBIN_ENHANCED_MODE=false
 ```
 
 ### All Studies with Enhanced Processing
+
 ```env
 WELLBIN_EMAIL=user@example.com
 WELLBIN_PASSWORD=mypassword
@@ -112,6 +116,7 @@ WELLBIN_HEADLESS=true
 ```
 
 ### Custom Directory Structure
+
 ```env
 WELLBIN_EMAIL=user@example.com
 WELLBIN_PASSWORD=mypassword
@@ -129,6 +134,7 @@ WELLBIN_PRESERVE_STRUCTURE=false
 ## Enhanced Mode Features
 
 When `WELLBIN_ENHANCED_MODE=true`:
+
 - Page-by-page processing with metadata
 - Advanced table detection and extraction
 - Word-level positioning data
@@ -160,6 +166,7 @@ When `WELLBIN_ENHANCED_MODE=true`:
 ### Debug Mode
 
 Enable verbose logging by setting:
+
 ```env
 WELLBIN_DEBUG=true
 ```
@@ -167,6 +174,7 @@ WELLBIN_DEBUG=true
 ### Validation
 
 Test your configuration:
+
 ```bash
 # Dry run to validate settings
 uv run wellbin scrape --dry-run
