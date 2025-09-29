@@ -54,6 +54,9 @@ dev-dependencies = [
     "pyright>=1.1.400",
     "bandit>=1.7.4",
     "safety>=2.3.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
 ]
 
 [tool.black]
@@ -84,8 +87,29 @@ max-line-length = 88
 extend-ignore = ["E203", "W503", "F811"]
 exclude = [".venv", "__pycache__", ".git", "build", "dist"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=wellbin",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=30"
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests (using real medical data)",
+    "unit: marks tests as unit tests"
+]
+
 [tool.pyright]
-include = ["wellbin"]
+include = ["wellbin", "tests"]
 exclude = [
     "**/__pycache__",
     ".venv",

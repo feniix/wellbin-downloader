@@ -47,8 +47,9 @@ class PDFToMarkdownConverter:
         size = span.get("size", 0)
         font = span.get("font", "").lower()
 
-        # Main medical report sections (H2)
+        # Main medical report sections (H2) - English and Spanish
         main_sections = [
+            # English terms
             "PATIENT INFORMATION",
             "LABORATORY RESULTS",
             "CLINICAL FINDINGS",
@@ -66,10 +67,20 @@ class PDFToMarkdownConverter:
             "FINDINGS",
             "IMPRESSION",
             "COMMENTS",
+            # Spanish terms from real medical data
+            "HEMOGRAMA COMPLETO",
+            "RESONANCIA MAGNETICA",
+            "TIEMPO DE PROTROMBINA",
+            "ERITROSEDIMENTACION",
+            "FERRITINA",
+            "APTT",
+            "DIAGNOSTICO POR IMAGENES",
+            "ESTUDIO",
         ]
 
-        # Subsections (H3)
+        # Subsections (H3) - English and Spanish
         subsections = [
+            # English terms
             "CHEMISTRY",
             "HEMATOLOGY",
             "LIPID PANEL",
@@ -86,6 +97,12 @@ class PDFToMarkdownConverter:
             "DIFFERENTIAL",
             "PLATELET",
             "COAGULATION",
+            # Spanish terms from real medical data
+            "SERIE ERITROCITARIA",
+            "SERIE LEUCOCITARIA",
+            "SERIE TROMBOCITARIA",
+            "METODO",
+            "CONCENTRACION",
         ]
 
         # Check for main sections

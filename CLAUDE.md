@@ -31,6 +31,25 @@ uv run isort wellbin/
 
 # Run type checking
 uv run pyright wellbin/
+
+# Run tests
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=wellbin --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_utils.py
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run only fast tests (exclude slow tests)
+uv run pytest -m "not slow"
+
+# Run integration tests with real medical data
+uv run pytest -m integration
+uv run pytest tests/test_integration.py
 ```
 
 ### Security and Quality Assurance
@@ -300,6 +319,59 @@ Uses font size and styling cues to determine header hierarchy for optimal markdo
 - Progress indicators and status reporting throughout operations
 
 ### Testing Strategy
+
+**Test Framework:** Uses pytest with comprehensive coverage reporting and mocking capabilities.
+
+**Test Structure:**
+- `tests/test_utils.py`: Core utilities (configuration, validation)
+- `tests/test_cli.py`: CLI commands and Click integration
+- `tests/test_converter.py`: PDF to markdown conversion
+- `tests/test_scraper.py`: Web scraping with Selenium (mocked)
+
+**Test Categories:**
+- **Unit tests**: Individual function testing with mocking
+- **Integration tests**: Component interaction testing with real medical data
+- **CLI tests**: Command-line interface testing with Click's TestRunner
+- **Real-world validation**: Tests using actual medical PDFs and converted markdown
+
+**Running Tests:**
+```bash
+# Run all tests with coverage
+uv run pytest --cov=wellbin --cov-report=term-missing
+
+# Run specific test categories
+uv run pytest -m "unit"          # Unit tests only
+uv run pytest -m "integration"   # Integration tests only
+uv run pytest -m "not slow"      # Exclude slow tests
+
+# Debug test failures
+uv run pytest -v -s tests/test_utils.py::TestValidateCredentials
+
+# Run real medical data tests (requires medical_data_source/ directory)
+uv run pytest tests/test_integration.py -v
+```
+
+**Integration Test Features:**
+- Uses anonymized Spanish medical reports for realistic testing (lab + imaging)
+- Tests medical header detection with authentic document patterns
+- Validates filename pattern compliance (YYYYMMDD-type-N.pdf format)
+- Checks markdown conversion quality and structure
+- Includes fixtures based on real medical data with privacy protection
+
+**Test Fixtures:**
+- `tests/fixtures/medical_data/` contains anonymized medical reports
+- Lab reports: normal values (recent) and elevated values (older)
+- Imaging reports: MRI with findings (recent) and normal CT (older)
+- All fixtures maintain authentic Spanish medical terminology
+- Safe for public repositories and CI systems
+
+**Test Configuration:**
+- Minimum 30% code coverage required (currently achieving 60%+)
+- Automatic HTML coverage reports in `htmlcov/`
+- Strict marker and configuration validation
+- Comprehensive fixture setup in `tests/conftest.py`
+
+**Manual Testing Strategies:**
 - Test CLI commands locally with `--dry-run` flag for scraping
 - Use debug mode with `WELLBIN_DEBUG=true` environment variable
 - Validate configuration before operations using credential validation
@@ -630,3 +702,10 @@ free -h  # memory usage
 - Browser automation uses appropriate user agents and delays
 - File downloads validate response status and handle streaming properly
 - No sensitive data logged or exposed in debug output
+
+## Git Commit Guidelines
+
+- Never include references to Claude or AI assistance in commit messages
+- Focus on technical changes and functional improvements
+- Use conventional commit format when possible
+- Keep commit messages concise and descriptive of the actual changes made
