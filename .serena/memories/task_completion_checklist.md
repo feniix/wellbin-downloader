@@ -2,20 +2,24 @@
 
 ## When a Task is Completed
 
-### 1. Code Quality Checks
+### 1. Code Quality Checks (Ruff-based)
 
-#### Formatting
+#### Formatting and Linting Combined
 ```bash
-# Auto-format code
+# Auto-format code and fix linting errors
 uv run ruff format wellbin/
+uv run ruff check --fix wellbin/
+
+# Or do both in one command via pre-commit
+uv run pre-commit run --all-files
 ```
 
-#### Linting
+#### Checking Without Fixing
 ```bash
-# Check for linting errors
+# Check code quality without modifying
 uv run ruff check wellbin/
 
-# Verify formatting
+# Verify formatting without modifying
 uv run ruff format --check wellbin/
 ```
 
@@ -71,8 +75,8 @@ uv run safety check
 uv run pre-commit run --all-files
 
 # This will run:
-# - ruff lint (linting with auto-fix)
-# - ruff format (code formatting)
+# - ruff check (unified linting - replaces flake8, pylint, etc.)
+# - ruff format (code formatting + import sorting - replaces Black/isort)
 # - trailing-whitespace
 # - end-of-file-fixer
 # - check-yaml
@@ -81,6 +85,9 @@ uv run pre-commit run --all-files
 # - check-added-large-files
 # - check-merge-conflict
 # - mixed-line-ending
+# - python-check-blanket-noqa
+# - python-check-blanket-type-ignore
+# - python-use-type-annotations
 ```
 
 ### 5. Manual Testing (if applicable)
@@ -135,24 +142,29 @@ git commit -m "descriptive message"
 
 ## Quick Checklist
 
-- [ ] Code formatted with Ruff
-- [ ] No Ruff linting errors
-- [ ] Type checking passes with pyright
-- [ ] All tests pass
+- [ ] Code formatted with `ruff format`
+- [ ] No linting errors from `ruff check`
+- [ ] Type checking passes with `pyright`
+- [ ] All tests pass with `pytest`
 - [ ] Coverage meets minimum threshold (30%+)
-- [ ] Security checks pass (bandit, safety)
-- [ ] Pre-commit hooks pass
+- [ ] Security checks pass (`bandit`, `safety`)
+- [ ] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 - [ ] Manual testing completed (if applicable)
 - [ ] Documentation updated (if needed)
 - [ ] Git commit with proper message
 
 ## Common Issues and Fixes
 
-### Formatting Issues
+### Formatting and Linting Issues
 ```bash
-# Auto-fix formatting
+# Auto-fix formatting issues
 uv run ruff format wellbin/
+
+# Auto-fix linting errors
 uv run ruff check --fix wellbin/
+
+# Or use pre-commit to fix both
+uv run pre-commit run --all-files
 ```
 
 ### Import Errors

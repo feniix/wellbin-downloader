@@ -7,11 +7,14 @@
 - Line length: 88 characters (Black default)
 - Target Python version: 3.9+
 
-### Formatting Tools
-- **Ruff**: Fast linting and formatting (replaces Black/isort/flake8)
-- **Ruff format**: Code formatting (line length: 120)
-- **Ruff lint**: Linting with auto-fix capability
-- Line length: 120 characters (configured in pyproject.toml)
+### Formatting Tools (Ruff v0.8.0+)
+- **Ruff**: Fast, unified linting and formatting tool
+  - Replaces: Black, isort, flake8, and other individual tools
+  - Configuration: `pyproject.toml` [tool.ruff] section
+  - Line length: 120 characters
+  - **ruff format**: Code formatting
+  - **ruff check**: Linting with auto-fix capability (`--fix` flag)
+  - **ruff check --watch**: Watch mode for development
 
 ### Type Hints
 - **Strict type checking** with Pyright
@@ -20,9 +23,10 @@
 - All functions should have type annotations for parameters and return values
 
 ### Import Organization
-- Ruff handles import organization (built-in, no need for isort)
-- Line length: 120 characters
-- Imports automatically organized by ruff lint --fix
+- Ruff automatically handles import organization
+- Configured via isort compatibility in `[tool.ruff.isort]` section
+- Imports automatically organized by `ruff check --fix`
+- No separate isort step needed
 
 ### Naming Conventions
 - **Classes**: PascalCase (e.g., `WellbinMedicalDownloader`, `PDFToMarkdownConverter`)
@@ -103,15 +107,19 @@
 
 ## Pre-commit Hooks
 Automated checks run on every commit:
-- **ruff lint**: Fast linting with auto-fix
-- **ruff format**: Code formatting
-- Trailing whitespace removal
-- End-of-file fixer
-- YAML validation
-- TOML validation
-- JSON validation
-- Large file detection
-- Merge conflict detection
-- Case conflict detection
-- Mixed line ending detection
-- Python specific checks (blanket noqa, type ignore, type annotations)
+- **ruff lint**: Fast linting with auto-fix (replaces flake8, pylint, etc.)
+- **ruff format**: Code formatting (replaces Black)
+  - Automatically handles import sorting (replaces isort)
+  - Line length: 120 characters
+  - Includes all code quality checks
+- **trailing-whitespace**: Remove trailing whitespace
+- **end-of-file-fixer**: Ensure files end with newline
+- **check-yaml**: Validate YAML syntax
+- **check-toml**: Validate TOML files (pyproject.toml)
+- **check-json**: Validate JSON files
+- **check-added-large-files**: Prevent large file commits
+- **check-merge-conflict**: Detect merge conflict markers
+- **mixed-line-ending**: Enforce LF line endings
+- **python-check-blanket-noqa**: Prevent blanket `# noqa` comments
+- **python-check-blanket-type-ignore**: Prevent blanket `# type: ignore` comments
+- **python-use-type-annotations**: Enforce type annotations over type comments

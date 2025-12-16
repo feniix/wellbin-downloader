@@ -73,14 +73,13 @@ This document provides a quick reference to all onboarding information. For deta
 # Setup
 uv sync --dev
 
-# Before committing
-uv run black wellbin/
-uv run isort wellbin/
-uv run flake8 wellbin/
+# Before committing (using Ruff)
+uv run ruff format wellbin/
+uv run ruff check --fix wellbin/
 uv run pyright wellbin/
 uv run pytest --cov=wellbin
 
-# Or use pre-commit hooks
+# Or use pre-commit hooks (runs all checks automatically)
 uv run pre-commit run --all-files
 ```
 
@@ -159,11 +158,10 @@ uv run pytest -m "not slow"            # Fast tests only
 uv run pytest tests/test_utils.py      # Specific file
 ```
 
-### Code Quality
+### Code Quality (Ruff-based)
 ```bash
-uv run black wellbin/                  # Format
-uv run isort wellbin/                  # Sort imports
-uv run flake8 wellbin/                 # Lint
+uv run ruff format wellbin/            # Format (includes import sorting)
+uv run ruff check --fix wellbin/       # Lint and auto-fix
 uv run pyright wellbin/                # Type check
 ```
 

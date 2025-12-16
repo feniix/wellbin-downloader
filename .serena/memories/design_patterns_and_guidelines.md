@@ -182,12 +182,24 @@ Built-in delays respect platform resources:
 ## Development Workflow Patterns
 
 ### Pre-commit Hooks
-Automated quality enforcement:
+Automated quality enforcement via Ruff v0.8.0+:
 
-1. **Code Quality**: Ruff (linting + formatting replaces Black/isort/flake8)
-2. **File checks**: trailing whitespace, end-of-file, YAML, TOML, JSON, large files, merge conflicts
-3. **Python checks**: blanket noqa prevention, type ignore prevention, type annotations enforcement
-4. **Other checks**: case conflicts, mixed line ending detection
+1. **Code Quality (Ruff)**:
+   - `ruff check`: Unified linting (replaces flake8, pylint, etc.)
+   - `ruff format`: Code formatting + import sorting (replaces Black + isort)
+   - Line length: 120 characters
+   - Handles all code quality checks in one pass
+
+2. **File Validation**:
+   - trailing whitespace, end-of-file-fixer
+   - YAML, TOML, JSON validation
+   - Large file detection, merge conflict detection
+   - Case conflict detection, mixed line ending detection
+
+3. **Python-Specific Checks**:
+   - blanket noqa prevention
+   - blanket type ignore prevention
+   - type annotations enforcement
 
 ### Test-Driven Development
 1. Write tests first (or alongside code)

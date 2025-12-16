@@ -53,16 +53,22 @@ uv run pytest tests/test_integration.py
 uv run pytest -v -s tests/test_utils.py::TestValidateCredentials
 ```
 
-## Code Quality Commands
+## Code Quality Commands (Ruff-based)
 ```bash
-# Run linting
-uv run flake8 wellbin/
-uv run black --check wellbin/
-uv run isort --check-only wellbin/
+# Check code quality
+uv run ruff check wellbin/
 
-# Auto-format code
-uv run black wellbin/
-uv run isort wellbin/
+# Auto-fix code quality issues
+uv run ruff check --fix wellbin/
+
+# Format code (includes import sorting)
+uv run ruff format wellbin/
+
+# Check formatting without fixing
+uv run ruff format --check wellbin/
+
+# Watch mode for development (auto-check on file changes)
+uv run ruff check --watch wellbin/
 
 # Run type checking
 uv run pyright wellbin/
