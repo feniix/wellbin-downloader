@@ -60,6 +60,34 @@ class WellbinMedicalDownloader:
             },
         }
 
+    @staticmethod
+    def _is_valid_date(year: int, month: int, day: int) -> bool:
+        """Validate that date components form a valid calendar date."""
+        if not (1900 <= year <= 2099):
+            return False
+        if not (1 <= month <= 12):
+            return False
+
+        days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        # Handle leap years
+        if month == 2 and ((year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)):
+            max_day = 29
+        else:
+            max_day = days_in_month[month - 1]
+
+        return 1 <= day <= max_day
+
+    @staticmethod
+    def _sanitize_xpath_string(s: str) -> str:
+        """Sanitize string for safe use in XPath expressions."""
+        if "'" not in s:
+            return f"'{s}'"
+        if '"' not in s:
+            return f'"{s}"'
+        # For strings with both quotes, use concat() function
+        parts = s.split("'")
+        return "concat('" + "', \"'\", '".join(parts) + "')"
+
     def setup_driver(self) -> None:
         """Setup Chrome driver with appropriate options"""
         chrome_options = Options()
@@ -122,8 +150,15 @@ class WellbinMedicalDownloader:
                 print(f"❌ Login failed. Expected dashboard URL, got: {current_url}")
                 return False
 
+        except NoSuchElementException as e:
+            print(f"❌ Login form element not found: {e}")
+            print("   Check if login page structure has changed")
+            return False
         except Exception as e:
-            print(f"❌ Error during login: {e}")
+            print(f"❌ Unexpected error during login: {type(e).__name__}: {e}")
+            import traceback
+
+            print(traceback.format_exc())
             return False
 
     def extract_study_dates_from_explorer(self) -> bool:
@@ -181,15 +216,15 @@ class WellbinMedicalDownloader:
 
                     # Also check siblings and nearby elements
                     try:
-                        # Look for date in various nearby elements
-                        nearby_xpath = (
-                            f"//a[@href='{href}']/ancestor::*[1]//*[contains(text(), '202') or contains(text(), '201')]"
-                        )
+                        # Look for date in various nearby elements (using sanitized XPath)
+                        href_xpath = self._sanitize_xpath_string(href)
+                        date_pattern = "contains(text(), '202') or contains(text(), '201')"
+                        nearby_xpath = f"//a[@href={href_xpath}]/ancestor::*[1]//*[{date_pattern}]"
                         nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
                         for nearby in nearby_elements:
                             container_text += " " + nearby.text
-                    except Exception:  # noqa: S110
-                        pass
+                    except Exception as e:  # noqa: S110
+                        print(f"    ⚠️  Could not extract nearby date elements: {type(e).__name__}")
 
                     # Extract date from the container text
                     study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
@@ -213,14 +248,17 @@ class WellbinMedicalDownloader:
                                 print(f"  ⚠️  {href} -> 20240101 (fallback)")
 
                 except Exception as e:
-                    print(f"  ❌ Error extracting date for element: {e}")
+                    print(f"  ❌ Error extracting date for element: {type(e).__name__}: {e}")
                     continue
 
             print(f"📊 Extracted dates for {len(self.study_dates)} studies")
             return True
 
         except Exception as e:
-            print(f"❌ Error extracting study dates: {e}")
+            print(f"❌ Error extracting study dates: {type(e).__name__}: {e}")
+            import traceback
+
+            print(f"Traceback: {traceback.format_exc()}")
             return False
 
     def parse_date_from_text(self, text: str, date_patterns: list[str], month_map: dict[str, str]) -> Optional[str]:
@@ -233,28 +271,39 @@ class WellbinMedicalDownloader:
                         if pattern == date_patterns[0]:  # MM/DD/YYYY or DD/MM/YYYY
                             # Handle both DD/MM/YYYY and MM/DD/YYYY formats
                             part1, part2, year = match
+                            part1_int, part2_int, year_int = int(part1), int(part2), int(year)
+
                             # Try to determine format based on values
-                            if int(part1) > 12:  # Must be DD/MM/YYYY (day > 12)
-                                day, month = part1, part2
-                            elif int(part2) > 12:  # Must be MM/DD/YYYY (day > 12)
-                                month, day = part1, part2
-                            else:  # Ambiguous - assume DD/MM/YYYY (European format as shown in image)
-                                day, month = part1, part2
-                            return f"{year}{month.zfill(2)}{day.zfill(2)}"
+                            if part1_int > 12:  # Must be DD/MM/YYYY (day > 12)
+                                day, month = part1_int, part2_int
+                            elif part2_int > 12:  # Must be MM/DD/YYYY (day > 12)
+                                month, day = part1_int, part2_int
+                            else:  # Ambiguous - assume DD/MM/YYYY (European format)
+                                day, month = part1_int, part2_int
+
+                            # Validate the date
+                            if self._is_valid_date(year_int, month, day):
+                                return f"{year_int}{month:02d}{day:02d}"
 
                         elif pattern == date_patterns[1]:  # YYYY/MM/DD
-                            year, month, day = match
-                            return f"{year}{month.zfill(2)}{day.zfill(2)}"
+                            year_str, month_str, day_str = match
+                            year_int, month_int, day_int = int(year_str), int(month_str), int(day_str)
+                            if self._is_valid_date(year_int, month_int, day_int):
+                                return f"{year_int}{month_int:02d}{day_int:02d}"
 
                         elif pattern == date_patterns[2]:  # DD Mon YYYY
-                            day, month_name, year = match
-                            month = month_map.get(month_name, "01")
-                            return f"{year}{month}{day.zfill(2)}"
+                            day_str, month_name, year_str = match
+                            day_int, year_int = int(day_str), int(year_str)
+                            month_int = int(month_map.get(month_name, "01"))
+                            if self._is_valid_date(year_int, month_int, day_int):
+                                return f"{year_int}{month_int:02d}{day_int:02d}"
 
                         elif pattern == date_patterns[3]:  # Mon DD, YYYY
-                            month_name, day, year = match
-                            month = month_map.get(month_name, "01")
-                            return f"{year}{month}{day.zfill(2)}"
+                            month_name, day_str, year_str = match
+                            day_int, year_int = int(day_str), int(year_str)
+                            month_int = int(month_map.get(month_name, "01"))
+                            if self._is_valid_date(year_int, month_int, day_int):
+                                return f"{year_int}{month_int:02d}{day_int:02d}"
 
                 except (ValueError, KeyError):
                     continue
@@ -275,9 +324,10 @@ class WellbinMedicalDownloader:
             if match:
                 year, month, day = match.groups()
                 try:
-                    # Validate date components
-                    if 1900 <= int(year) <= 2030 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
-                        return f"{year}{month.zfill(2)}{day.zfill(2)}"
+                    year_int, month_int, day_int = int(year), int(month), int(day)
+                    # Validate date components using proper calendar validation
+                    if self._is_valid_date(year_int, month_int, day_int):
+                        return f"{year_int}{month_int:02d}{day_int:02d}"
                 except ValueError:
                     continue
 
@@ -313,8 +363,9 @@ class WellbinMedicalDownloader:
             # Find study elements that match our filtered links
             for href in study_links:
                 try:
-                    # Find the specific study element by href
-                    study_elements = self.driver.find_elements(By.XPATH, f"//a[@href='{href}']")
+                    # Find the specific study element by href (using sanitized XPath)
+                    href_xpath = self._sanitize_xpath_string(href)
+                    study_elements = self.driver.find_elements(By.XPATH, f"//a[@href={href_xpath}]")
 
                     for element in study_elements:
                         try:
@@ -338,9 +389,9 @@ class WellbinMedicalDownloader:
                                     if elem_text and has_date:
                                         container_text += " " + elem_text
 
-                                # Also check siblings and nearby elements
+                                # Also check siblings and nearby elements (using sanitized XPath)
                                 nearby_xpath = (
-                                    f"//a[@href='{href}']/ancestor::*[1]//*["
+                                    f"//a[@href={href_xpath}]/ancestor::*[1]//*["
                                     "contains(text(), '202') or "
                                     "contains(text(), '201') or "
                                     "contains(text(), '/')]"
@@ -349,8 +400,8 @@ class WellbinMedicalDownloader:
                                 for nearby in nearby_elements:
                                     if nearby.text.strip():
                                         container_text += " " + nearby.text
-                            except Exception:  # noqa: S110
-                                pass
+                            except Exception as e:  # noqa: S110
+                                print(f"    ⚠️  Could not extract date patterns from parent: {type(e).__name__}")
 
                             # Extract date from the container text
                             study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
@@ -376,7 +427,8 @@ class WellbinMedicalDownloader:
                                         print(f"  ⚠️  {href} -> 20240101 (fallback)")
                                         break
 
-                        except Exception:
+                        except Exception as e:
+                            print(f"    ❌ Error processing element: {type(e).__name__}: {e}")
                             continue
 
                     # If no date found for this study, use fallback
@@ -723,12 +775,23 @@ class WellbinMedicalDownloader:
             return downloaded_files
 
         except Exception as e:
-            print(f"❌ Error during download: {e}")
+            print(f"❌ Error during download: {type(e).__name__}: {e}")
             import traceback
 
             print(f"🔍 Traceback: {traceback.format_exc()}")
             return downloaded_files
         finally:
-            if self.driver:
-                print("🔒 Closing browser...")
-                self.driver.quit()
+            # Clean up resources
+            try:
+                if self.driver:
+                    print("🔒 Closing browser...")
+                    self.driver.quit()
+            except Exception as e:
+                print(f"⚠️  Error closing browser: {type(e).__name__}: {e}")
+
+            # Ensure session is closed
+            try:
+                if self.session:
+                    self.session.close()
+            except Exception as e:
+                print(f"⚠️  Error closing session: {type(e).__name__}: {e}")

@@ -287,3 +287,160 @@ class TestWellbinMedicalDownloader:
             downloader.scrape_studies()
 
         mock_driver.quit.assert_called_once()
+
+    # Tests for bug fixes
+    def test_is_valid_date(self, downloader):
+        """Test date validation helper."""
+        # Valid dates
+        assert downloader._is_valid_date(2024, 6, 4) is True
+        assert downloader._is_valid_date(2024, 2, 29) is True  # Leap year
+        assert downloader._is_valid_date(2000, 2, 29) is True  # Leap year
+        assert downloader._is_valid_date(2023, 12, 31) is True
+
+        # Invalid dates
+        assert downloader._is_valid_date(2023, 2, 29) is False  # Not a leap year
+        assert downloader._is_valid_date(2024, 2, 30) is False  # February has 29 days max
+        assert downloader._is_valid_date(2024, 4, 31) is False  # April has 30 days
+        assert downloader._is_valid_date(2024, 13, 1) is False  # Invalid month
+        assert downloader._is_valid_date(2024, 0, 1) is False  # Invalid month
+        assert downloader._is_valid_date(2024, 1, 0) is False  # Invalid day
+        assert downloader._is_valid_date(2024, 1, 32) is False  # Invalid day
+        assert downloader._is_valid_date(1899, 6, 4) is False  # Year too old
+        assert downloader._is_valid_date(2099, 6, 4) is True  # Year within range
+        assert downloader._is_valid_date(2100, 6, 4) is False  # Year too new (limit is 2099)
+
+    def test_sanitize_xpath_string(self, downloader):
+        """Test XPath string sanitization."""
+        # Test single quotes - should wrap in double quotes
+        result = downloader._sanitize_xpath_string("test'value")
+        assert result == '"test\'value"'
+
+        # Test double quotes - should wrap in single quotes
+        result = downloader._sanitize_xpath_string('test"value')
+        assert result == "'test\"value'"
+
+        # Test no quotes - should wrap in single quotes
+        result = downloader._sanitize_xpath_string("testvalue")
+        assert result == "'testvalue'"
+
+        # Test both single and double quotes - should use concat()
+        result = downloader._sanitize_xpath_string("test'value\"mixed")
+        assert "concat" in result
+
+        # Test special characters (should be preserved)
+        result = downloader._sanitize_xpath_string("test/value?param=1")
+        assert "test/value?param=1" in result
+
+    def test_parse_date_invalid_dates_rejected(self, downloader):
+        """Test that invalid dates are rejected even if pattern matches."""
+        date_patterns = [
+            r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",
+            r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",
+            r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
+            r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",
+        ]
+        month_map = {
+            "Jan": "01",
+            "Feb": "02",
+            "Mar": "03",
+            "Apr": "04",
+            "May": "05",
+            "Jun": "06",
+            "Jul": "07",
+            "Aug": "08",
+            "Sep": "09",
+            "Oct": "10",
+            "Nov": "11",
+            "Dec": "12",
+        }
+
+        # Feb 30 should be rejected
+        result = downloader.parse_date_from_text("Date: 30/02/2024", date_patterns, month_map)
+        assert result is None
+
+        # April 31 should be rejected
+        result = downloader.parse_date_from_text("Date: 31/04/2024", date_patterns, month_map)
+        assert result is None
+
+        # Test with month 13 - second part > 12, so it will be parsed as MM/DD
+        # 05/13/2024 -> 05 (month) / 13 (day) - valid, should return 20240513
+        result = downloader.parse_date_from_text("Date: 05/13/2024", date_patterns, month_map)
+        assert result == "20240513"  # 05 (month) / 13 (day) is valid
+
+        # Valid Feb 29 in leap year should be accepted
+        result = downloader.parse_date_from_text("Date: 29/02/2024", date_patterns, month_map)
+        assert result == "20240229"
+
+        # Invalid Feb 29 in non-leap year should be rejected
+        result = downloader.parse_date_from_text("Date: 29/02/2023", date_patterns, month_map)
+        assert result is None
+
+    def test_extract_date_from_study_id_with_validation(self, downloader):
+        """Test date extraction from study ID with proper validation."""
+        # Valid date
+        result = downloader.extract_date_from_study_id("study_20240604_abc123")
+        assert result == "20240604"
+
+        # Invalid date (Feb 30)
+        result = downloader.extract_date_from_study_id("study_20240230_abc123")
+        assert result is None
+
+        # Invalid date (month 13)
+        result = downloader.extract_date_from_study_id("study_20241304_abc123")
+        assert result is None
+
+        # Valid leap year date
+        result = downloader.extract_date_from_study_id("study_20240229_abc123")
+        assert result == "20240229"
+
+        # Invalid non-leap year Feb 29
+        result = downloader.extract_date_from_study_id("study_20230229_abc123")
+        assert result is None
+
+    def test_parse_date_ambiguous_format(self, downloader):
+        """Test date parsing with ambiguous DD/MM vs MM/DD format."""
+        date_patterns = [r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b"]
+        month_map = {}
+
+        # Test ambiguous date (both parts ≤ 12)
+        # Should assume DD/MM/YYYY (European format)
+        result = downloader.parse_date_from_text("Date: 04/06/2024", date_patterns, month_map)
+        assert result == "20240604"
+
+        # Test unambiguous - second part > 12 (must be MM/DD)
+        result = downloader.parse_date_from_text("Date: 06/15/2024", date_patterns, month_map)
+        assert result == "20240615"
+
+        # Test unambiguous - first part > 12 (must be DD/MM)
+        result = downloader.parse_date_from_text("Date: 15/06/2024", date_patterns, month_map)
+        assert result == "20240615"
+
+    def test_scrape_studies_resource_cleanup(self, downloader):
+        """Test that both driver and session are cleaned up."""
+        mock_driver = Mock()
+        mock_session = Mock()
+        downloader.driver = mock_driver
+        downloader.session = mock_session
+
+        with patch.object(downloader, "login", return_value=False):
+            downloader.scrape_studies()
+
+        # Both should be closed
+        mock_driver.quit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+    def test_scrape_studies_resource_cleanup_on_error(self, downloader):
+        """Test that resources are cleaned up even if driver.quit() fails."""
+        mock_driver = Mock()
+        mock_driver.quit.side_effect = Exception("Driver quit failed")
+        mock_session = Mock()
+
+        downloader.driver = mock_driver
+        downloader.session = mock_session
+
+        with patch.object(downloader, "login", return_value=False):
+            # Should not raise exception even if driver.quit() fails
+            downloader.scrape_studies()
+
+        # Session should still be closed despite driver error
+        mock_session.close.assert_called_once()
