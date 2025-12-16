@@ -10,6 +10,8 @@ alwaysApply: true
 - **ALWAYS** use `uv` for Python package management and execution
 - **NEVER** use `pip`, `python`, `python3`, or `pipenv` directly
 - **NEVER** use virtual environment activation commands like `source .venv/bin/activate`
+- **Python Version**: 3.9+
+- **Package Manager**: uv (unified, fast, Rust-based)
 
 ## Code Execution
 - **ALWAYS** use `uv run` to execute Python scripts and modules
@@ -17,40 +19,168 @@ alwaysApply: true
   - `uv run python script.py` instead of `python script.py`
   - `uv run python -m module` instead of `python -m module`
   - `uv run pytest` instead of `pytest`
-  - `uv run flask run` instead of `flask run`
+  - `uv run wellbin scrape` instead of `wellbin scrape`
   - `uv run python -c "code"` for quick Python commands
 
 ## Dependency Management
 - Use `uv sync` to install/update dependencies from `pyproject.toml` and `uv.lock`
+  - `uv sync --dev` for development dependencies
 - Use `uv add package-name` to add new dependencies
 - Use `uv remove package-name` to remove dependencies
 - Use `uv lock` to update the lock file
-- Use `uv tree` to view dependency tree
+- Use `uv tree` to view dependency tree and nested dependencies
 
-## Development Commands
-- Testing: `uv run pytest` or `uv run python -m pytest`
-- Linting: `uv run flake8` or `uv run ruff check`
-- Formatting: `uv run black .` or `uv run ruff format`
-- Type checking: `uv run mypy`
-- Documentation: `uv run sphinx-build`
+## Code Quality and Testing Commands
+### Testing Framework (pytest)
+```bash
+# Run all tests
+uv run pytest
 
-## Project Setup
-- Use `uv init` for new projects
-- Use `uv python install` to install Python versions
-- Use `uv venv` only if explicitly needed for virtual environment creation
+# Run with coverage report
+uv run pytest --cov=wellbin --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_utils.py
+
+# Run specific test with verbose output
+uv run pytest -v tests/test_utils.py::TestValidateCredentials
+
+# Run only fast tests (exclude slow)
+uv run pytest -m "not slow"
+
+# Run integration tests
+uv run pytest -m integration
+uv run pytest tests/test_integration.py
+
+# Run with debugging
+uv run pytest -v -s tests/test_utils.py::TestValidateCredentials
+```
+
+### Code Quality (Ruff v0.8.0+)
+**NOTE**: Ruff is a unified tool that replaces Black, isort, flake8, and other individual linters
+
+```bash
+# Check code quality (linting)
+uv run ruff check wellbin/
+
+# Auto-fix code quality issues
+uv run ruff check --fix wellbin/
+
+# Format code (includes import organization)
+uv run ruff format wellbin/
+
+# Check formatting without fixing
+uv run ruff format --check wellbin/
+
+# Watch mode for development
+uv run ruff check --watch wellbin/
+
+# Type checking (separate tool)
+uv run pyright wellbin/
+```
+
+### Security Scanning
+```bash
+# Vulnerability scanning
+uv run bandit -r wellbin/
+
+# Check for known vulnerabilities in dependencies
+uv run safety check
+```
+
+### Pre-commit Hooks
+```bash
+# Install git hooks
+uv run pre-commit install
+
+# Run all hooks on all files
+uv run pre-commit run --all-files
+
+# Hooks run automatically on commit
+git commit -m "message"
+```
+
+## Project Setup and Installation
+```bash
+# Initial setup
+uv sync --dev
+
+# Install in development mode
+uv pip install -e .
+
+# Create new project
+uv init
+
+# Install Python versions (if needed)
+uv python install 3.9 3.10 3.11
+
+# Create virtual environment (rarely needed with uv)
+uv venv
+```
+
+## Wellbin Project Specific Commands
+```bash
+# Configuration
+uv run wellbin config
+
+# Download medical data
+uv run wellbin scrape
+uv run wellbin scrape --types all --limit 10
+uv run wellbin scrape --dry-run
+
+# Convert PDFs to markdown
+uv run wellbin convert
+uv run wellbin convert --enhanced-mode --file-type lab
+
+# Debug mode
+WELLBIN_DEBUG=true uv run wellbin scrape
+WELLBIN_DEBUG=true uv run wellbin scrape --no-headless --limit 1
+```
 
 ## Environment Variables and Scripts
 - When suggesting scripts or commands, always prefix Python execution with `uv run`
 - For shell scripts, ensure they use `uv run` for any Python commands
 - For Makefiles, use `uv run` in Python-related targets
+- Wellbin environment variables are prefixed with `WELLBIN_`
+
+### Configuration Environment Variables
+```bash
+# Required
+WELLBIN_EMAIL=your-email@example.com
+WELLBIN_PASSWORD=your-password
+
+# Optional
+WELLBIN_OUTPUT_DIR=medical_data
+WELLBIN_STUDY_TYPES=FhirStudy  # or "all"
+WELLBIN_STUDY_LIMIT=0
+WELLBIN_ENHANCED_MODE=false
+WELLBIN_HEADLESS=true
+WELLBIN_MARKDOWN_DIR=markdown_reports
+
+# Debug
+WELLBIN_DEBUG=true
+```
+
+### Setting Environment Variables
+```bash
+# Inline (single command)
+WELLBIN_DEBUG=true uv run wellbin scrape
+
+# Temporary (current session)
+export WELLBIN_DEBUG=true
+uv run wellbin scrape
+
+# Persistent (add to .env)
+echo "WELLBIN_DEBUG=true" >> .env
+```
 
 ## Examples of Correct Commands:
 ```bash
 # Running the main application
-uv run python <script_name>
+uv run python wellbin/cli.py
 
-# Running tests
-uv run pytest tests/
+# Running tests with coverage
+uv run pytest --cov=wellbin --cov-report=term-missing
 
 # Installing dependencies
 uv sync
@@ -59,13 +189,20 @@ uv sync
 uv add requests
 
 # Running a specific test file
-uv run pytest tests/test_example.py
+uv run pytest tests/test_integration.py
 
 # Running Python modules
 uv run python -m http.server 8000
 
-# Running development server
-uv run python -m flask run --host=0.0.0.0 --port=8000
+# Wellbin scraping with limit
+uv run wellbin scrape --limit 10
+
+# Wellbin conversion with enhanced mode
+uv run wellbin convert --enhanced-mode --file-type lab
+
+# Code quality check and fix
+uv run ruff check --fix wellbin/
+uv run ruff format wellbin/
 ```
 
 ## What NOT to do:
@@ -76,9 +213,65 @@ python script.py
 python -m pytest
 source .venv/bin/activate
 pipenv run python script.py
+black .
+flake8 wellbin/
+isort wellbin/
+python -c "from wellbin import ..."
 ```
+
+## Code Style Guidelines
+- **Line Length**: 120 characters (Ruff configured)
+- **Type Hints**: Use throughout codebase (strict Pyright mode)
+- **Docstrings**: Use for classes and public methods
+- **Naming**:
+  - Classes: PascalCase (e.g., `WellbinMedicalDownloader`)
+  - Functions/Methods: snake_case (e.g., `extract_study_dates`)
+  - Variables: snake_case (e.g., `study_type`, `output_dir`)
+  - Constants: UPPER_SNAKE_CASE (e.g., `DEFAULT_TIMEOUT`)
+  - Private: Leading underscore (e.g., `_internal_method`)
+
+## Testing Guidelines
+- **Test Structure**: `test_*.py` files with `Test*` classes and `test_*` methods
+- **Markers**: `unit`, `integration`, `slow` for categorization
+- **Coverage**: Minimum 30% (currently 60%+)
+- **Fixtures**: Anonymized Spanish medical data in `tests/fixtures/medical_data/`
+- **Run Tests**: Always use `uv run pytest` with appropriate markers/filters
 
 ## IDE Integration
 - Configure IDE to use `uv run` for Python execution
 - Set Python interpreter path to the one managed by uv
 - Use `uv run` in IDE terminal commands and run configurations
+- For VSCode/PyCharm: Configure runner to execute via `uv run`
+
+## Troubleshooting
+### Common uv Issues
+```bash
+# Update uv itself
+uv self update
+
+# Verify uv installation
+uv --version
+
+# Check Python version
+uv python --version
+
+# List installed Python versions
+uv python list
+
+# Sync dependencies (after pulling changes)
+uv sync --dev
+
+# Clear cache if needed
+uv cache clean
+```
+
+### Development Workflow
+```bash
+# Standard workflow
+uv sync --dev          # Install dependencies
+uv run ruff format .   # Format code
+uv run ruff check --fix wellbin/  # Lint with fixes
+uv run pytest          # Run tests
+uv run pyright wellbin/# Type check
+git commit -m "..."    # Pre-commit hooks run automatically
+```

@@ -1,9 +1,214 @@
 ---
-description:
-globs:
+description: Runtime standards for Wellbin Medical Data Downloader development
+globs: "**/*"
 alwaysApply: true
 ---
-all the tools sed, grep, findutils are all the gnu toolchain and not the macos ones
-the server must be run as ./dev.sh run
 
-to find the running server use lsof -i :8000 because dev.sh runs on port 8000
+# Runtime Standards for Wellbin Project
+
+## Operating System & Environment
+- **Platform**: macOS (Darwin)
+- **Shell**: zsh (default)
+- **Python Version**: 3.9+
+- **Package Manager**: uv (MANDATORY - never use pip, python, python3, or pipenv)
+
+## GNU Toolchain
+This system uses GNU toolchain (not BSD). All standard GNU tools are available:
+- `sed`, `grep`, `find`, and other GNU utilities work with standard flags and options
+- These are GNU-compatible, not macOS/BSD versions
+
+## Development Server (if applicable)
+- **Start Command**: `./dev.sh run`
+- **Default Port**: 8000
+- **Check if Running**: `lsof -i :8000`
+- **Kill Server**: `kill $(lsof -t -i :8000)`
+
+## Critical Python Execution Standards
+**MANDATORY: ALWAYS use `uv run` for all Python execution**
+
+```bash
+# CORRECT - Always use uv run
+uv run python script.py
+uv run pytest
+uv run wellbin scrape
+uv run wellbin convert
+uv run python -m module
+
+# INCORRECT - Never do this
+python script.py
+pytest
+python -m module
+pip install package
+source .venv/bin/activate
+```
+
+## Command Quality Tools (Ruff v0.8.0+)
+All code quality enforcement uses Ruff as the unified tool:
+
+```bash
+# Linting and auto-fix
+uv run ruff check wellbin/
+uv run ruff check --fix wellbin/
+
+# Code formatting (includes import organization)
+uv run ruff format wellbin/
+uv run ruff check --watch wellbin/
+
+# Type checking (separate tool)
+uv run pyright wellbin/
+
+# Security scanning
+uv run bandit -r wellbin/
+uv run safety check
+
+# Pre-commit hooks
+uv run pre-commit run --all-files
+uv run pre-commit install
+```
+
+## Browser & Selenium
+- **WebDriver**: Chrome/Chromium required
+- **Selenium Version**: 4.15+ (auto-manages ChromeDriver)
+- **Headless Mode**: Recommended for production
+- **Debug Mode**: Use `--no-headless` flag for visual debugging
+
+### Chrome Process Management
+```bash
+# Check if Chrome is running
+ps aux | grep -E "(chrome|chromium)"
+
+# Find Chrome processes on specific port
+lsof -i :PORT
+
+# Kill stuck Chrome processes
+pkill -f chrome
+pkill -f chromium
+
+# Clean temporary Chrome files
+rm -rf /tmp/.org.chromium.* 2>/dev/null || true
+```
+
+## Configuration & Credentials
+- **Config File**: `.env` in project root
+- **Generate Config**: `uv run wellbin config`
+- **Environment Variable Prefix**: `WELLBIN_`
+- **Credential Precedence**: CLI args > env vars > defaults
+- **Validate Before Use**: `uv run wellbin scrape --dry-run`
+
+## Debugging & Monitoring
+```bash
+# System Resources
+df -h                    # Disk space
+top                      # Process monitor
+htop                     # Enhanced process monitor (if installed)
+
+# Process Management
+ps aux | grep python     # Find Python processes
+pgrep -f "wellbin"       # Find specific process
+pkill -f "wellbin"       # Kill by pattern
+
+# Network Testing
+curl -I https://wellbin.co
+curl -I "https://wellbin-uploads.s3.amazonaws.com/"
+
+# Ports
+lsof -i :8000           # Find what's on port 8000
+lsof -i -P -n | grep LISTEN  # List all listening ports
+```
+
+## File System Operations
+```bash
+# Path separators: Use forward slashes (Unix standard)
+medical_data/lab_reports/
+medical_data/imaging_reports/
+
+# Create directories with parents
+mkdir -p path/to/directory
+
+# Check permissions
+ls -la directory/
+
+# Make executable
+chmod +x script.sh
+```
+
+## Git Operations
+- **Never** use `--no-verify` flag (skips pre-commit hooks)
+- **Never** force push to main/master
+- Pre-commit hooks run automatically on commit
+- Commit messages: Focus on technical changes, never mention AI assistance
+
+## Pre-commit Hook Enforcement
+Automated checks run on every commit using:
+- **ruff lint**: Fast linting with auto-fix
+- **ruff format**: Code formatting + import organization
+- File validation: trailing whitespace, YAML, TOML, JSON, merge conflicts
+- Python-specific: type annotations, blanket noqa prevention
+
+## Medical Data Processing
+- **Lab Reports**: FhirStudy type → `lab_reports/` directory
+- **Imaging Reports**: DicomStudy type → `imaging_reports/` directory
+- **File Pattern**: `YYYYMMDD-{type}-{counter}.pdf`
+- **Study Types**: "lab" or "imaging"
+
+## Environment Variables (WELLBIN_ prefix)
+```bash
+# Authentication (REQUIRED)
+WELLBIN_EMAIL=your-email@example.com
+WELLBIN_PASSWORD=your-password
+
+# Optional Configuration
+WELLBIN_OUTPUT_DIR=medical_data
+WELLBIN_STUDY_TYPES=FhirStudy  # or "all" for both
+WELLBIN_STUDY_LIMIT=0           # 0 = no limit
+WELLBIN_ENHANCED_MODE=false
+WELLBIN_HEADLESS=true
+WELLBIN_MARKDOWN_DIR=markdown_reports
+
+# Debug Mode
+WELLBIN_DEBUG=true              # Enable verbose logging
+```
+
+## Essential Workspace Paths
+- **Project Root**: `/Users/feniix/src/personal/cursor/wellbin`
+- **Medical Data Output**: `medical_data/` (in project root)
+- **Test Fixtures**: `tests/fixtures/medical_data/`
+- **Configuration Template**: `.env.example`
+
+## Common Issues & Recovery
+### Browser Session Crashes
+```bash
+# Kill all browser processes
+pkill -f chrome
+
+# Clear temporary files
+rm -rf /tmp/.org.chromium.* 2>/dev/null || true
+
+# Restart operation
+uv run wellbin scrape --limit 5
+```
+
+### Python Execution Errors
+- **Always verify**: Using `uv run` prefix
+- **Check environment**: `uv sync --dev` to ensure all dependencies installed
+- **Verify configuration**: `uv run wellbin scrape --dry-run`
+
+### Memory Issues
+```bash
+# Monitor during conversion
+top -p $(pgrep -f "wellbin convert")
+
+# Process in batches
+uv run wellbin convert --file-type lab
+uv run wellbin convert --file-type imaging
+```
+
+### Large Operations
+- Use `--limit` parameter for testing: `uv run wellbin scrape --limit 10`
+- Process data in batches rather than full operations
+- Disable enhanced mode if memory-constrained: `WELLBIN_ENHANCED_MODE=false`
+
+## Docker & Container Notes (if applicable)
+- Not currently containerized
+- Can be containerized with Python 3.9+ base image
+- Requires Chrome/Chromium for Selenium operations
