@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 import requests
+from selenium.common.exceptions import NoSuchElementException
 
 from wellbin.core.scraper import WellbinMedicalDownloader
 
@@ -444,3 +445,224 @@ class TestWellbinMedicalDownloader:
 
         # Session should still be closed despite driver error
         mock_session.close.assert_called_once()
+
+    # High Priority Tests - Critical Login & Scraping Logic
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_login_success(self, mock_chrome, downloader):
+        """Test successful login flow with form filling and dashboard detection."""
+        # Setup mock driver
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+        mock_driver.current_url = "https://wellbin.co/dashboard"
+
+        # Mock form elements
+        email_field = Mock()
+        password_field = Mock()
+        submit_button = Mock()
+
+        mock_driver.find_element.side_effect = [
+            email_field,
+            password_field,
+            submit_button,
+        ]
+
+        # Perform login
+        result = downloader.login()
+
+        # Verify result
+        assert result is True
+        assert downloader.driver == mock_driver
+
+        # Verify form interactions
+        email_field.clear.assert_called_once()
+        email_field.send_keys.assert_called_once_with("test@example.com")
+        password_field.clear.assert_called_once()
+        password_field.send_keys.assert_called_once_with("testpassword")
+        submit_button.click.assert_called_once()
+
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_login_failure_wrong_url(self, mock_chrome, downloader):
+        """Test login failure when dashboard URL is not reached."""
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+
+        # Mock form elements
+        email_field = Mock()
+        password_field = Mock()
+        submit_button = Mock()
+
+        mock_driver.find_element.side_effect = [
+            email_field,
+            password_field,
+            submit_button,
+        ]
+
+        # Simulate wrong redirect URL
+        mock_driver.current_url = "https://wellbin.co/login"
+
+        result = downloader.login()
+
+        assert result is False
+
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_login_failure_missing_element(self, mock_chrome, downloader):
+        """Test login failure when form elements cannot be found."""
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+
+        # Simulate element not found
+        mock_driver.find_element.side_effect = NoSuchElementException("Element not found")
+
+        result = downloader.login()
+
+        assert result is False
+
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_get_study_links_filtering_fhir(self, mock_chrome, downloader):
+        """Test study link filtering for FhirStudy type."""
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+        downloader.setup_driver()
+
+        # Create mock links with different study types
+        fhir_link = Mock()
+        fhir_link.get_attribute.return_value = "https://wellbin.co/study/123?type=FhirStudy"
+
+        dicom_link = Mock()
+        dicom_link.get_attribute.return_value = "https://wellbin.co/study/456?type=DicomStudy"
+
+        # Mock finding links
+        mock_driver.find_elements.return_value = [fhir_link, dicom_link]
+
+        # Test with FhirStudy filter
+        downloader.study_types = ["FhirStudy"]
+        links = downloader.get_study_links()
+
+        # Should only get FhirStudy
+        assert len(links) == 1
+        assert "type=FhirStudy" in links[0]
+
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_get_study_links_filtering_all_types(self, mock_chrome, downloader):
+        """Test study link filtering with 'all' study types."""
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+        downloader.setup_driver()
+
+        # Create mock links with different study types
+        fhir_link = Mock()
+        fhir_link.get_attribute.return_value = "https://wellbin.co/study/123?type=FhirStudy"
+
+        dicom_link = Mock()
+        dicom_link.get_attribute.return_value = "https://wellbin.co/study/456?type=DicomStudy"
+
+        mock_driver.find_elements.return_value = [fhir_link, dicom_link]
+
+        # Test with 'all' filter
+        downloader.study_types = ["all"]
+        links = downloader.get_study_links()
+
+        # Should get both
+        assert len(links) == 2
+
+    @patch("wellbin.core.scraper.webdriver.Chrome")
+    def test_get_study_links_with_limit(self, mock_chrome, downloader):
+        """Test study link limiting."""
+        mock_driver = Mock()
+        mock_chrome.return_value = mock_driver
+        downloader.setup_driver()
+
+        # Create 10 mock links
+        mock_links = []
+        for i in range(10):
+            link = Mock()
+            link.get_attribute.return_value = f"https://wellbin.co/study/{i}?type=FhirStudy"
+            mock_links.append(link)
+
+        mock_driver.find_elements.return_value = mock_links
+
+        # Set limit to 5
+        downloader.limit_studies = 5
+        links = downloader.get_study_links()
+
+        # Should only get 5
+        assert len(links) == 5
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_http_400_error(self, mock_get, downloader, mock_study_info):
+        """Test PDF download with 400 Bad Request error."""
+        mock_response = Mock()
+        mock_response.status_code = 400
+        mock_get.return_value = mock_response
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is None
+        mock_get.assert_called_once()
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_http_403_forbidden(self, mock_get, downloader, mock_study_info):
+        """Test PDF download with 403 Forbidden error."""
+        mock_response = Mock()
+        mock_response.status_code = 403
+        mock_get.return_value = mock_response
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is None
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_http_500_error(self, mock_get, downloader, mock_study_info):
+        """Test PDF download with 500 Server error."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_get.return_value = mock_response
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is None
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_connection_timeout(self, mock_get, downloader, mock_study_info):
+        """Test PDF download with connection timeout."""
+        import requests
+
+        mock_get.side_effect = requests.Timeout("Connection timed out")
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is None
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_connection_error(self, mock_get, downloader, mock_study_info):
+        """Test PDF download with connection error."""
+        import requests
+
+        mock_get.side_effect = requests.ConnectionError("Failed to connect")
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is None
+
+    @patch("wellbin.core.scraper.requests.Session.get")
+    def test_download_pdf_file_saved_correctly(self, mock_get, downloader, mock_study_info, temp_dir):
+        """Test that downloaded PDF file is saved correctly."""
+        # Update output dir to temp
+        downloader.output_dir = str(temp_dir)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.iter_content.return_value = [b"chunk1", b"chunk2", b"chunk3"]
+        mock_get.return_value = mock_response
+
+        result = downloader.download_pdf(mock_study_info)
+
+        assert result is not None
+        assert result.endswith(".pdf")
+
+        # Verify file was created
+        from pathlib import Path
+
+        pdf_path = Path(result)
+        assert pdf_path.exists()
+        assert pdf_path.read_bytes() == b"chunk1chunk2chunk3"
