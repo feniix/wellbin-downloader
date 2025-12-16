@@ -6,24 +6,24 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "mcp__serena__think_about_task_adherence",
-      "mcp__serena__get_symbols_overview",
-      "mcp__serena__read_memory",
-      "mcp__serena__find_symbol",
-      "mcp__serena__insert_after_symbol",
+      "Bash(uv run pytest:*)",
       "mcp__exa__get_code_context_exa",
-      "Bash(uv run pytest:*)"
+      "mcp__serena__find_symbol",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__insert_after_symbol",
+      "mcp__serena__read_memory",
+      "mcp__serena__think_about_task_adherence"
     ],
     "deny": [],
     "ask": []
   },
   "enabledMcpjsonServers": [
-    "playwright",
-    "mcp-pandoc",
-    "sequential-thinking",
-    "serena",
     "exa",
-    "ref"
+    "mcp-pandoc",
+    "playwright",
+    "ref",
+    "sequential-thinking",
+    "serena"
   ],
   "enableAllMcpServers": true
 }
