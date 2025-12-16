@@ -1,0 +1,21 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright",
+    "mcp-pandoc",
+    "sequential-thinking",
+    "serena",
+    "exa",
+    "ref"
+  ]
+}

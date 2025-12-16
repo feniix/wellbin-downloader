@@ -2,7 +2,7 @@
 Scrape command for downloading medical data from Wellbin platform.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import click
 from dotenv import load_dotenv
@@ -15,9 +15,7 @@ load_dotenv()
 
 
 @click.command()
-@click.option(
-    "--email", "-e", help="Email for Wellbin login (overrides WELLBIN_EMAIL env var)"
-)
+@click.option("--email", "-e", help="Email for Wellbin login (overrides WELLBIN_EMAIL env var)")
 @click.option(
     "--password",
     "-p",
@@ -87,29 +85,11 @@ def scrape(
     """
 
     # PROPER PRECEDENCE: CLI args override env vars override defaults
-    final_email: str = (
-        email
-        if email is not None
-        else get_env_default("WELLBIN_EMAIL", "your-email@example.com")
-    )
-    final_password: str = (
-        password
-        if password is not None
-        else get_env_default("WELLBIN_PASSWORD", "your-password")
-    )
-    final_limit: int = (
-        limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
-    )
-    final_types: str = (
-        types
-        if types is not None
-        else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
-    )
-    final_output: str = (
-        output
-        if output is not None
-        else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
-    )
+    final_email: str = email if email is not None else get_env_default("WELLBIN_EMAIL", "your-email@example.com")
+    final_password: str = password if password is not None else get_env_default("WELLBIN_PASSWORD", "your-password")
+    final_limit: int = limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
+    final_types: str = types if types is not None else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
+    final_output: str = output if output is not None else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
 
     # For boolean flags: True/False if provided, otherwise check env var, otherwise default
     if headless is not None:
@@ -137,9 +117,7 @@ def scrape(
     click.echo("🚀 Wellbin Medical Data Downloader")
     click.echo("=" * 50)
     click.echo(f"📧 Email: {final_email}")
-    click.echo(
-        f"🔢 Study limit: {final_limit_optional if final_limit_optional else 'No limit (all studies)'}"
-    )
+    click.echo(f"🔢 Study limit: {final_limit_optional if final_limit_optional else 'No limit (all studies)'}")
     click.echo(f"🎯 Study types: {', '.join(study_types)}")
     click.echo(f"📁 Output directory: {final_output}")
     click.echo(f"🤖 Headless mode: {final_headless}")
@@ -179,7 +157,7 @@ def scrape(
     click.echo("=" * 60)
 
     # Group by study type for summary
-    by_type: Dict[str, List[Dict[str, Any]]] = {}
+    by_type: dict[str, list[dict[str, Any]]] = {}
 
     if downloaded_files:
         click.echo(f"✅ Successfully downloaded {len(downloaded_files)} files:")
@@ -191,12 +169,8 @@ def scrape(
             by_type[study_type].append(file_info)
 
         for study_type, files in by_type.items():
-            config = downloader.study_config.get(
-                study_type, {"icon": "📄", "description": study_type}
-            )
-            click.echo(
-                f"\n{config['icon']} {config['description']} ({len(files)} files):"
-            )
+            config = downloader.study_config.get(study_type, {"icon": "📄", "description": study_type})
+            click.echo(f"\n{config['icon']} {config['description']} ({len(files)} files):")
             for i, file_info in enumerate(files, 1):
                 click.echo(f"  {i}. 📄 {file_info['local_path']}")
                 click.echo(f"     📅 Study date: {file_info['study_date']}")
@@ -208,9 +182,7 @@ def scrape(
     if downloaded_files:
         click.echo(f"\n📁 Files organized in {final_output}/:")
         for study_type in by_type.keys():
-            config = downloader.study_config.get(
-                study_type, {"subdir": "unknown", "icon": "📄"}
-            )
+            config = downloader.study_config.get(study_type, {"subdir": "unknown", "icon": "📄"})
             file_count = len(by_type[study_type])
             click.echo(f"  {config['icon']} {config['subdir']}/  ({file_count} files)")
 

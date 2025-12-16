@@ -9,7 +9,6 @@ realistic testing of the PDF conversion and analysis functionality.
 """
 
 from pathlib import Path
-from typing import Dict, List
 
 # Get the directory containing this file
 FIXTURES_DIR = Path(__file__).parent
@@ -52,9 +51,7 @@ def get_fixture_path(report_type: str, age: str) -> Path:
         ValueError: If report_type or age is invalid
     """
     if report_type not in ALL_TEST_FILES:
-        raise ValueError(
-            f"Invalid report_type: {report_type}. Must be one of: {list(ALL_TEST_FILES.keys())}"
-        )
+        raise ValueError(f"Invalid report_type: {report_type}. Must be one of: {list(ALL_TEST_FILES.keys())}")
 
     if age not in ALL_TEST_FILES[report_type]:
         raise ValueError(
@@ -84,7 +81,7 @@ def get_fixture_content(report_type: str, age: str) -> str:
     return fixture_path.read_text(encoding="utf-8")
 
 
-def list_all_fixtures() -> Dict[str, List[str]]:
+def list_all_fixtures() -> dict[str, list[str]]:
     """
     List all available fixture files.
 

@@ -3,7 +3,7 @@ Tests for wellbin.core.scraper module.
 """
 
 from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
@@ -37,9 +37,7 @@ class TestWellbinMedicalDownloader:
 
     def test_downloader_default_values(self, temp_dir):
         """Test downloader with default values."""
-        downloader = WellbinMedicalDownloader(
-            email="test@example.com", password="testpassword"
-        )
+        downloader = WellbinMedicalDownloader(email="test@example.com", password="testpassword")
 
         assert downloader.headless is True
         assert downloader.limit_studies is None
@@ -114,27 +112,19 @@ class TestWellbinMedicalDownloader:
         }
 
         # Test DD/MM/YYYY format
-        result = downloader.parse_date_from_text(
-            "Date: 04/06/2024", date_patterns, month_map
-        )
+        result = downloader.parse_date_from_text("Date: 04/06/2024", date_patterns, month_map)
         assert result == "20240604"
 
         # Test YYYY-MM-DD format
-        result = downloader.parse_date_from_text(
-            "Date: 2024-06-04", date_patterns, month_map
-        )
+        result = downloader.parse_date_from_text("Date: 2024-06-04", date_patterns, month_map)
         assert result == "20240604"
 
         # Test Month DD, YYYY format
-        result = downloader.parse_date_from_text(
-            "Date: Jun 04, 2024", date_patterns, month_map
-        )
+        result = downloader.parse_date_from_text("Date: Jun 04, 2024", date_patterns, month_map)
         assert result == "20240604"
 
         # Test no date found
-        result = downloader.parse_date_from_text(
-            "No date here", date_patterns, month_map
-        )
+        result = downloader.parse_date_from_text("No date here", date_patterns, month_map)
         assert result is None
 
     def test_extract_date_from_study_id(self, downloader):
@@ -152,9 +142,7 @@ class TestWellbinMedicalDownloader:
         assert result is None
 
         # Test invalid date
-        result = downloader.extract_date_from_study_id(
-            "study_20241301_abc123"
-        )  # Invalid month
+        result = downloader.extract_date_from_study_id("study_20241301_abc123")  # Invalid month
         assert result is None
 
     def test_generate_filename(self, downloader):
@@ -186,9 +174,7 @@ class TestWellbinMedicalDownloader:
         assert filename == "20240101-lab-0.pdf"  # Should use fallback date
 
     @patch("wellbin.core.scraper.requests.Session.get")
-    def test_download_pdf_success(
-        self, mock_get, downloader, mock_study_info, temp_dir
-    ):
+    def test_download_pdf_success(self, mock_get, downloader, mock_study_info, temp_dir):
         """Test successful PDF download."""
         # Mock successful response
         mock_response = Mock()

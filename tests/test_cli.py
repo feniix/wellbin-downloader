@@ -5,7 +5,6 @@ Tests for wellbin CLI commands.
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from click.testing import CliRunner
 
 from wellbin.cli import cli
@@ -103,9 +102,7 @@ class TestScrapeCommand:
 
             result = runner.invoke(cli, ["scrape"])
 
-            assert (
-                result.exit_code == 0
-            )  # Command runs but exits early with error message
+            assert result.exit_code == 0  # Command runs but exits early with error message
             assert "❌" in result.output
             assert "uv run wellbin config" in result.output
 
@@ -114,9 +111,7 @@ class TestScrapeCommand:
         runner = CliRunner()
 
         # Mock the downloader to avoid actual web scraping
-        with patch(
-            "wellbin.commands.scrape.WellbinMedicalDownloader"
-        ) as mock_downloader:
+        with patch("wellbin.commands.scrape.WellbinMedicalDownloader") as mock_downloader:
             mock_instance = mock_downloader.return_value
             mock_instance.scrape_studies.return_value = []
 
@@ -156,9 +151,7 @@ class TestConvertCommand:
         # Mock the converter to avoid actual PDF processing
         with (
             patch("wellbin.commands.convert.PDFToMarkdownConverter") as mock_converter,
-            patch(
-                "wellbin.commands.convert.convert_structured_directories"
-            ) as mock_structured,
+            patch("wellbin.commands.convert.convert_structured_directories") as mock_structured,
         ):
             mock_instance = mock_converter.return_value
             mock_instance.convert_all_pdfs.return_value = []
@@ -184,10 +177,7 @@ class TestConvertCommand:
                 mock_structured.assert_called_once()
             else:
                 # Just verify the command ran successfully
-                assert (
-                    "Convert medical PDFs" in result.output
-                    or "No files were converted" in result.output
-                )
+                assert "Convert medical PDFs" in result.output or "No files were converted" in result.output
 
     def test_convert_command_enhanced_mode(self, temp_dir):
         """Test convert command with enhanced mode."""
@@ -195,9 +185,7 @@ class TestConvertCommand:
 
         with (
             patch("wellbin.commands.convert.PDFToMarkdownConverter") as mock_converter,
-            patch(
-                "wellbin.commands.convert.convert_structured_directories"
-            ) as mock_structured,
+            patch("wellbin.commands.convert.convert_structured_directories") as mock_structured,
         ):
             mock_instance = mock_converter.return_value
             mock_instance.convert_all_pdfs.return_value = []

@@ -9,7 +9,7 @@ import os
 import re
 import time
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Optional
+from typing import Any, Optional
 
 import requests
 from selenium import webdriver
@@ -26,7 +26,7 @@ class WellbinMedicalDownloader:
         password: str,
         headless: bool = True,
         limit_studies: Optional[int] = None,
-        study_types: Optional[List[str]] = None,
+        study_types: Optional[list[str]] = None,
         output_dir: str = "downloads",
     ) -> None:
         self.email = email
@@ -38,18 +38,14 @@ class WellbinMedicalDownloader:
         self.driver: Optional[webdriver.Chrome] = None
         self.wait: Optional[WebDriverWait[webdriver.Chrome]] = None
         self.headless = headless
-        self.limit_studies = (
-            limit_studies  # None = all studies, number = limit to that many
-        )
+        self.limit_studies = limit_studies  # None = all studies, number = limit to that many
         self.study_types = study_types or ["FhirStudy"]  # Default to FhirStudy only
         self.output_dir = output_dir
-        self.study_dates: Dict[str, str] = {}  # Map study URLs to dates
-        self.date_counters: DefaultDict[str, int] = defaultdict(
-            int
-        )  # For deduplication per study type
+        self.study_dates: dict[str, str] = {}  # Map study URLs to dates
+        self.date_counters: defaultdict[str, int] = defaultdict(int)  # For deduplication per study type
 
         # Study type configuration
-        self.study_config: Dict[str, Dict[str, str]] = {
+        self.study_config: dict[str, dict[str, str]] = {
             "FhirStudy": {
                 "name": "lab",
                 "description": "Laboratory Reports",
@@ -73,9 +69,12 @@ class WellbinMedicalDownloader:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument(
-            "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        user_agent = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
         )
+        chrome_options.add_argument(f"--user-agent={user_agent}")
 
         print("🔧 Setting up Chrome driver...")
         self.driver = webdriver.Chrome(options=chrome_options)
@@ -97,12 +96,8 @@ class WellbinMedicalDownloader:
 
             # Fill login form
             print("📝 Filling login credentials...")
-            email_field = self.driver.find_element(
-                By.CSS_SELECTOR, "input[type='email']"
-            )
-            password_field = self.driver.find_element(
-                By.CSS_SELECTOR, "input[type='password']"
-            )
+            email_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='email']")
+            password_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='password']")
 
             email_field.clear()
             email_field.send_keys(self.email)
@@ -111,9 +106,7 @@ class WellbinMedicalDownloader:
 
             # Submit form
             print("🚀 Submitting login form...")
-            submit_button = self.driver.find_element(
-                By.CSS_SELECTOR, "button[type='submit']"
-            )
+            submit_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
             submit_button.click()
 
             time.sleep(3)
@@ -166,9 +159,7 @@ class WellbinMedicalDownloader:
             }
 
             # Find all study links and their associated dates
-            study_elements = self.driver.find_elements(
-                By.XPATH, "//a[contains(@href, '/study/')]"
-            )
+            study_elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, '/study/')]")
 
             print(f"🔍 Found {len(study_elements)} study elements, extracting dates...")
 
@@ -179,28 +170,29 @@ class WellbinMedicalDownloader:
                         continue
 
                     # Get the parent container to look for dates nearby
-                    parent = element.find_element(
-                        By.XPATH,
-                        "./ancestor::*[contains(@class, 'study') or contains(@class, 'card') or contains(@class, 'item') or contains(@class, 'row')][1]",
+                    parent_xpath = (
+                        "./ancestor::*[contains(@class, 'study') or "
+                        "contains(@class, 'card') or "
+                        "contains(@class, 'item') or "
+                        "contains(@class, 'row')][1]"
                     )
+                    parent = element.find_element(By.XPATH, parent_xpath)
                     container_text = parent.text if parent else element.text
 
                     # Also check siblings and nearby elements
                     try:
                         # Look for date in various nearby elements
-                        nearby_elements = self.driver.find_elements(
-                            By.XPATH,
-                            f"//a[@href='{href}']/ancestor::*[1]//*[contains(text(), '202') or contains(text(), '201')]",
+                        nearby_xpath = (
+                            f"//a[@href='{href}']/ancestor::*[1]//*[contains(text(), '202') or contains(text(), '201')]"
                         )
+                        nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
                         for nearby in nearby_elements:
                             container_text += " " + nearby.text
-                    except:
+                    except Exception:  # noqa: S110
                         pass
 
                     # Extract date from the container text
-                    study_date = self.parse_date_from_text(
-                        container_text, date_patterns, month_map
-                    )
+                    study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
 
                     if study_date:
                         self.study_dates[href] = study_date
@@ -231,9 +223,7 @@ class WellbinMedicalDownloader:
             print(f"❌ Error extracting study dates: {e}")
             return False
 
-    def parse_date_from_text(
-        self, text: str, date_patterns: List[str], month_map: Dict[str, str]
-    ) -> Optional[str]:
+    def parse_date_from_text(self, text: str, date_patterns: list[str], month_map: dict[str, str]) -> Optional[str]:
         """Parse date from text using various patterns"""
         for pattern in date_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -286,18 +276,14 @@ class WellbinMedicalDownloader:
                 year, month, day = match.groups()
                 try:
                     # Validate date components
-                    if (
-                        1900 <= int(year) <= 2030
-                        and 1 <= int(month) <= 12
-                        and 1 <= int(day) <= 31
-                    ):
+                    if 1900 <= int(year) <= 2030 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
                         return f"{year}{month.zfill(2)}{day.zfill(2)}"
                 except ValueError:
                     continue
 
         return None
 
-    def extract_dates_for_studies(self, study_links: List[str]) -> None:
+    def extract_dates_for_studies(self, study_links: list[str]) -> None:
         """Extract dates only for specific study links"""
         try:
             # Common date patterns to look for
@@ -328,52 +314,50 @@ class WellbinMedicalDownloader:
             for href in study_links:
                 try:
                     # Find the specific study element by href
-                    study_elements = self.driver.find_elements(
-                        By.XPATH, f"//a[@href='{href}']"
-                    )
+                    study_elements = self.driver.find_elements(By.XPATH, f"//a[@href='{href}']")
 
                     for element in study_elements:
                         try:
                             # Get the parent container to look for dates nearby
-                            parent = element.find_element(
-                                By.XPATH,
-                                "./ancestor::*[contains(@class, 'study') or contains(@class, 'card') or contains(@class, 'item') or contains(@class, 'row')][1]",
+                            parent_xpath = (
+                                "./ancestor::*[contains(@class, 'study') or "
+                                "contains(@class, 'card') or "
+                                "contains(@class, 'item') or "
+                                "contains(@class, 'row')][1]"
                             )
+                            parent = element.find_element(By.XPATH, parent_xpath)
                             container_text = parent.text if parent else element.text
 
-                            # Look for dates in the bottom area of study cards (like bottom-left in the image)
+                            # Look for dates in the bottom area of study cards
                             try:
                                 # Look for date patterns in the entire parent container
                                 date_elements = parent.find_elements(By.XPATH, ".//*")
                                 for date_elem in date_elements:
                                     elem_text = date_elem.text.strip()
-                                    if elem_text and (
-                                        "/" in elem_text
-                                        or any(char.isdigit() for char in elem_text)
-                                    ):
+                                    has_date = "/" in elem_text or any(char.isdigit() for char in elem_text)
+                                    if elem_text and has_date:
                                         container_text += " " + elem_text
 
                                 # Also check siblings and nearby elements
-                                nearby_elements = self.driver.find_elements(
-                                    By.XPATH,
-                                    f"//a[@href='{href}']/ancestor::*[1]//*[contains(text(), '202') or contains(text(), '201') or contains(text(), '/')]",
+                                nearby_xpath = (
+                                    f"//a[@href='{href}']/ancestor::*[1]//*["
+                                    "contains(text(), '202') or "
+                                    "contains(text(), '201') or "
+                                    "contains(text(), '/')]"
                                 )
+                                nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
                                 for nearby in nearby_elements:
                                     if nearby.text.strip():
                                         container_text += " " + nearby.text
-                            except:
+                            except Exception:  # noqa: S110
                                 pass
 
                             # Extract date from the container text
-                            study_date = self.parse_date_from_text(
-                                container_text, date_patterns, month_map
-                            )
+                            study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
 
                             if study_date:
                                 self.study_dates[href] = study_date
-                                print(
-                                    f"  📅 {href} -> {study_date} (found in text: '{container_text[:100]}...')"
-                                )
+                                print(f"  📅 {href} -> {study_date} (found in text: '{container_text[:100]}...')")
                                 break  # Found date for this study, move to next
                             else:
                                 # Fallback: extract from URL or use current date
@@ -381,20 +365,14 @@ class WellbinMedicalDownloader:
                                 if study_id_match:
                                     study_id = study_id_match.group(1)
                                     # Try to extract date from study ID (some IDs contain timestamps)
-                                    fallback_date = self.extract_date_from_study_id(
-                                        study_id
-                                    )
+                                    fallback_date = self.extract_date_from_study_id(study_id)
                                     if fallback_date:
                                         self.study_dates[href] = fallback_date
-                                        print(
-                                            f"  📅 {href} -> {fallback_date} (from ID)"
-                                        )
+                                        print(f"  📅 {href} -> {fallback_date} (from ID)")
                                         break
                                     else:
                                         # Use a default date pattern
-                                        self.study_dates[href] = (
-                                            "20240101"  # Default fallback
-                                        )
+                                        self.study_dates[href] = "20240101"  # Default fallback
                                         print(f"  ⚠️  {href} -> 20240101 (fallback)")
                                         break
 
@@ -420,9 +398,7 @@ class WellbinMedicalDownloader:
         try:
             assert self.driver is not None, "Driver should be initialized"
             # Look for the div with class "item-value report-date"
-            date_element = self.driver.find_element(
-                By.CSS_SELECTOR, "div.item-value.report-date"
-            )
+            date_element = self.driver.find_element(By.CSS_SELECTOR, "div.item-value.report-date")
             date_text = date_element.text.strip()
 
             if date_text:
@@ -451,9 +427,7 @@ class WellbinMedicalDownloader:
                     "Dec": "12",
                 }
 
-                parsed_date = self.parse_date_from_text(
-                    date_text, date_patterns, month_map
-                )
+                parsed_date = self.parse_date_from_text(date_text, date_patterns, month_map)
                 if parsed_date:
                     return parsed_date
 
@@ -476,7 +450,7 @@ class WellbinMedicalDownloader:
             print(f"    ❌ Error extracting date from study page: {e}")
             return "20240101"  # Default fallback
 
-    def get_study_links(self) -> List[str]:
+    def get_study_links(self) -> list[str]:
         """Get study links from the explorer page, filtered by study type"""
         try:
             print("🔍 Navigating to Explorer to find studies...")
@@ -489,7 +463,7 @@ class WellbinMedicalDownloader:
             print(f"📍 Explorer page URL: {current_url}")
 
             # Look for study links
-            study_links: List[str] = []
+            study_links: list[str] = []
 
             # Find all links on the page
             print("🔎 Searching for study links...")
@@ -516,10 +490,7 @@ class WellbinMedicalDownloader:
                         # Handle "all" study types
                         if not study_type_found and "all" in self.study_types:
                             # Check if it's any of the known study types
-                            if any(
-                                f"type={st}" in href
-                                for st in ["FhirStudy", "DicomStudy"]
-                            ):
+                            if any(f"type={st}" in href for st in ["FhirStudy", "DicomStudy"]):
                                 study_links.append(href)
                                 print(f"  ✅ Found (all types): {href}")
 
@@ -531,9 +502,7 @@ class WellbinMedicalDownloader:
 
             # Apply limit if specified
             if self.limit_studies and len(study_links) > self.limit_studies:
-                print(
-                    f"🔢 Limiting to {self.limit_studies} studies (found {len(study_links)})"
-                )
+                print(f"🔢 Limiting to {self.limit_studies} studies (found {len(study_links)})")
                 study_links = study_links[: self.limit_studies]
 
             # Note: Dates will be extracted when processing individual study pages
@@ -545,18 +514,14 @@ class WellbinMedicalDownloader:
             print(f"❌ Error getting study links: {e}")
             return []
 
-    def get_pdf_from_study(
-        self, study_url: str, study_index: int = 1, total_studies: int = 1
-    ) -> List[Dict[str, Any]]:
+    def get_pdf_from_study(self, study_url: str, study_index: int = 1, total_studies: int = 1) -> list[dict[str, Any]]:
         """Get PDF download links from a study page"""
         try:
             # Extract study type from URL
             type_match = re.search(r"type=([^&]+)", study_url)
             study_type = type_match.group(1) if type_match else "Unknown"
 
-            print(
-                f"\n[{study_index}/{total_studies}] 📄 Processing {study_type} study:"
-            )
+            print(f"\n[{study_index}/{total_studies}] 📄 Processing {study_type} study:")
             print(f"  🔗 URL: {study_url}")
 
             assert self.driver is not None, "Driver should be initialized"
@@ -575,9 +540,7 @@ class WellbinMedicalDownloader:
 
             try:
                 # Go directly to S3 URL selector since we know it works
-                elements = self.driver.find_elements(
-                    By.XPATH, "//a[contains(@href, 'wellbin-uploads.s3')]"
-                )
+                elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'wellbin-uploads.s3')]")
 
                 download_element = None
                 if elements:
@@ -585,15 +548,13 @@ class WellbinMedicalDownloader:
                     download_element = elements[0]
                     href = download_element.get_attribute("href")
                     text = download_element.text.strip()
-                    print(
-                        f"  ✅ Found S3 download link: '{text}' -> {href and href[:100]}..."
-                    )
+                    print(f"  ✅ Found S3 download link: '{text}' -> {href and href[:100]}...")
 
                 if download_element:
                     href = download_element.get_attribute("href")
                     text = download_element.text.strip() or "Download"
 
-                    pdf_info: Dict[str, Any] = {
+                    pdf_info: dict[str, Any] = {
                         "url": href,
                         "text": text,
                         "study_url": study_url,
@@ -605,15 +566,11 @@ class WellbinMedicalDownloader:
                 else:
                     # Debug: show all links on the page
                     print("  🔍 All links on page:")
-                    all_links = self.driver.find_elements(By.TAG_NAME, "a")[
-                        :10
-                    ]  # First 10 links
+                    all_links = self.driver.find_elements(By.TAG_NAME, "a")[:10]  # First 10 links
                     for i, link in enumerate(all_links, 1):
                         href = link.get_attribute("href")
                         text = link.text.strip()
-                        print(
-                            f"    {i}. '{text}' -> {href[:80] if href else 'No href'}..."
-                        )
+                        print(f"    {i}. '{text}' -> {href[:80] if href else 'No href'}...")
 
                     print("  ❌ No S3 download link found")
                     return []
@@ -647,23 +604,24 @@ class WellbinMedicalDownloader:
 
     def download_pdf(
         self,
-        pdf_info: Dict[str, Any],
+        pdf_info: dict[str, Any],
         download_index: int = 1,
         total_downloads: int = 1,
     ) -> Optional[str]:
         """Download a PDF file"""
         try:
             study_date = pdf_info["study_date"]
-            print(
-                f"\n[{download_index}/{total_downloads}] 📥 Downloading {pdf_info['study_type']} PDF ({study_date}):"
-            )
+            print(f"\n[{download_index}/{total_downloads}] 📥 Downloading {pdf_info['study_type']} PDF ({study_date}):")
             print(f"  📝 Description: {pdf_info['text']}")
             print(f"  🔗 URL: {pdf_info['url'][:100]}...")
 
             # S3 URLs are pre-signed, no authentication needed
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
+            user_agent = (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+            headers = {"User-Agent": user_agent}
 
             print("  🌐 Making download request...")
             response = self.session.get(pdf_info["url"], headers=headers, stream=True)
@@ -680,9 +638,7 @@ class WellbinMedicalDownloader:
             print(f"  📁 Generated filename: {filename}")
 
             # Create output directories
-            config = self.study_config.get(
-                pdf_info["study_type"], {"subdir": "unknown"}
-            )
+            config = self.study_config.get(pdf_info["study_type"], {"subdir": "unknown"})
             output_subdir = os.path.join(self.output_dir, config["subdir"])
             os.makedirs(output_subdir, exist_ok=True)
             filepath = os.path.join(output_subdir, filename)
@@ -697,7 +653,7 @@ class WellbinMedicalDownloader:
                         file_size += len(chunk)
 
             print("  ✅ Downloaded successfully!")
-            print(f"  📏 File size: {file_size:,} bytes ({file_size/1024/1024:.2f} MB)")
+            print(f"  📏 File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
             return filepath
 
         except Exception as e:
@@ -707,9 +663,9 @@ class WellbinMedicalDownloader:
             print(f"  🔍 Traceback: {traceback.format_exc()}")
             return None
 
-    def scrape_studies(self) -> List[Dict[str, Any]]:
+    def scrape_studies(self) -> list[dict[str, Any]]:
         """Main method to download studies and download PDFs"""
-        downloaded_files: List[Dict[str, Any]] = []
+        downloaded_files: list[dict[str, Any]] = []
 
         try:
             # Login
@@ -726,7 +682,7 @@ class WellbinMedicalDownloader:
             print(f"\n🎯 Processing {len(study_links)} studies...")
 
             # Process each study
-            all_pdf_links: List[Dict[str, Any]] = []
+            all_pdf_links: list[dict[str, Any]] = []
             for i, study_url in enumerate(study_links, 1):
                 pdf_links = self.get_pdf_from_study(study_url, i, len(study_links))
                 for pdf in pdf_links:

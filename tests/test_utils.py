@@ -3,10 +3,7 @@ Tests for wellbin.core.utils module.
 """
 
 import os
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from wellbin.core.utils import (
     create_config_file,

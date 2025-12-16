@@ -3,9 +3,7 @@ Tests for wellbin.core.converter module.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from wellbin.core.converter import (
     PDFToMarkdownConverter,
@@ -43,9 +41,7 @@ class TestPDFToMarkdownConverter:
         output_dir = temp_dir / "output"
         assert not output_dir.exists()
 
-        PDFToMarkdownConverter(
-            pdf_dir=str(temp_dir), output_dir=str(output_dir), enhanced_mode=False
-        )
+        PDFToMarkdownConverter(pdf_dir=str(temp_dir), output_dir=str(output_dir), enhanced_mode=False)
 
         assert output_dir.exists()
 
@@ -83,9 +79,7 @@ class TestPDFToMarkdownConverter:
         """Test markdown extraction in standard mode."""
         mock_to_markdown.return_value = "# Test Markdown Content"
 
-        converter = PDFToMarkdownConverter(
-            str(temp_dir), str(temp_dir / "output"), enhanced_mode=False
-        )
+        converter = PDFToMarkdownConverter(str(temp_dir), str(temp_dir / "output"), enhanced_mode=False)
         pdf_path = temp_dir / "test.pdf"
         pdf_path.write_bytes(b"fake pdf content")
 
@@ -103,9 +97,7 @@ class TestPDFToMarkdownConverter:
         ]
         mock_to_markdown.return_value = mock_chunks
 
-        converter = PDFToMarkdownConverter(
-            str(temp_dir), str(temp_dir / "output"), enhanced_mode=True
-        )
+        converter = PDFToMarkdownConverter(str(temp_dir), str(temp_dir / "output"), enhanced_mode=True)
         pdf_path = temp_dir / "test.pdf"
         pdf_path.write_bytes(b"fake pdf content")
 
@@ -190,9 +182,7 @@ class TestPDFToMarkdownConverter:
     def test_convert_all_pdfs_missing_directory(self, temp_dir):
         """Test convert_all_pdfs with missing input directory."""
         nonexistent_dir = temp_dir / "nonexistent"
-        converter = PDFToMarkdownConverter(
-            str(nonexistent_dir), str(temp_dir / "output")
-        )
+        converter = PDFToMarkdownConverter(str(nonexistent_dir), str(temp_dir / "output"))
 
         result = converter.convert_all_pdfs()
 
@@ -252,9 +242,7 @@ class TestConvertStructuredDirectories:
         with patch.object(PDFToMarkdownConverter, "convert_all_pdfs") as mock_convert:
             mock_convert.return_value = [Path("test.md")]
 
-            result = convert_structured_directories(
-                str(input_dir), str(output_dir), "all", enhanced_mode=True
-            )
+            result = convert_structured_directories(str(input_dir), str(output_dir), "all", enhanced_mode=True)
 
             assert len(result) == 2  # Both directories processed
             assert mock_convert.call_count == 2
@@ -291,8 +279,6 @@ class TestConvertStructuredDirectories:
         input_dir.mkdir()
         output_dir = temp_dir / "output"
 
-        result = convert_structured_directories(
-            str(input_dir), str(output_dir), "all", enhanced_mode=False
-        )
+        result = convert_structured_directories(str(input_dir), str(output_dir), "all", enhanced_mode=False)
 
         assert result == []

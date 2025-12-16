@@ -18,7 +18,6 @@ from wellbin.core.converter import (
 
 from .fixtures.medical_fixtures import (
     EXPECTED_PATTERNS,
-    get_fixture_content,
     get_fixture_path,
     validate_fixture_content,
 )
@@ -33,23 +32,15 @@ class TestMedicalDataIntegration:
         lab_recent_path = get_fixture_path("lab", "recent")
         lab_older_path = get_fixture_path("lab", "older")
 
-        assert (
-            lab_recent_path.exists()
-        ), f"Recent lab fixture should exist at {lab_recent_path}"
-        assert (
-            lab_older_path.exists()
-        ), f"Older lab fixture should exist at {lab_older_path}"
+        assert lab_recent_path.exists(), f"Recent lab fixture should exist at {lab_recent_path}"
+        assert lab_older_path.exists(), f"Older lab fixture should exist at {lab_older_path}"
 
         # Test imaging report fixtures
         imaging_recent_path = get_fixture_path("imaging", "recent")
         imaging_older_path = get_fixture_path("imaging", "older")
 
-        assert (
-            imaging_recent_path.exists()
-        ), f"Recent imaging fixture should exist at {imaging_recent_path}"
-        assert (
-            imaging_older_path.exists()
-        ), f"Older imaging fixture should exist at {imaging_older_path}"
+        assert imaging_recent_path.exists(), f"Recent imaging fixture should exist at {imaging_recent_path}"
+        assert imaging_older_path.exists(), f"Older imaging fixture should exist at {imaging_older_path}"
 
     def test_fixture_content_validation(self, all_fixture_reports):
         """Test that fixture content contains valid medical report structures."""
@@ -57,30 +48,22 @@ class TestMedicalDataIntegration:
             report_type = "lab" if "lab" in report_name else "imaging"
 
             # Validate content structure
-            assert validate_fixture_content(
-                report_type, content
-            ), f"Invalid content in {report_name}"
+            assert validate_fixture_content(report_type, content), f"Invalid content in {report_name}"
 
             # Check basic medical report structure
             assert "# Medical Report:" in content, f"Missing header in {report_name}"
-            assert (
-                "**Source File:**" in content
-            ), f"Missing source file info in {report_name}"
-            assert (
-                "**Extracted:**" in content
-            ), f"Missing extraction timestamp in {report_name}"
+            assert "**Source File:**" in content, f"Missing source file info in {report_name}"
+            assert "**Extracted:**" in content, f"Missing extraction timestamp in {report_name}"
 
     def test_lab_report_content_structure(self, sample_lab_report_recent):
         """Test that lab reports contain expected medical terminology and structure."""
         content = sample_lab_report_recent
 
         # Check for lab-specific patterns
-        lab_patterns = EXPECTED_PATTERNS["lab"]
+        EXPECTED_PATTERNS["lab"]
 
         # Should contain key lab report sections
-        assert (
-            "HEMOGRAMA COMPLETO" in content
-        ), "Should have complete blood count section"
+        assert "HEMOGRAMA COMPLETO" in content, "Should have complete blood count section"
         assert "SERIE ERITROCITARIA" in content, "Should have red blood cell series"
         assert "SERIE LEUCOCITARIA" in content, "Should have white blood cell series"
 
@@ -100,20 +83,15 @@ class TestMedicalDataIntegration:
         imaging_patterns = EXPECTED_PATTERNS["imaging"]
 
         # Should contain imaging study type
-        assert any(
-            header in content
-            for header in ["RESONANCIA MAGNETICA", "TOMOGRAFIA COMPUTADA"]
-        ), "Should contain imaging study type"
+        assert any(header in content for header in ["RESONANCIA MAGNETICA", "TOMOGRAFIA COMPUTADA"]), (
+            "Should contain imaging study type"
+        )
 
         # Should contain findings section
-        assert (
-            "HALLAZGOS" in content or "CONCLUSION" in content
-        ), "Should contain findings or conclusion section"
+        assert "HALLAZGOS" in content or "CONCLUSION" in content, "Should contain findings or conclusion section"
 
         # Should contain anatomical references
-        anatomical_terms_found = sum(
-            1 for term in imaging_patterns["anatomical_terms"] if term in content
-        )
+        anatomical_terms_found = sum(1 for term in imaging_patterns["anatomical_terms"] if term in content)
         assert anatomical_terms_found > 0, "Should contain anatomical terminology"
 
     def test_medical_header_detection_with_real_data(self):
@@ -179,12 +157,12 @@ class TestMedicalDataIntegration:
 
         date_pattern = re.compile(r"^\d{8}-lab-\d+\.md$")
 
-        assert date_pattern.match(
-            lab_recent_path.name
-        ), f"Lab recent filename should match pattern: {lab_recent_path.name}"
-        assert date_pattern.match(
-            lab_older_path.name
-        ), f"Lab older filename should match pattern: {lab_older_path.name}"
+        assert date_pattern.match(lab_recent_path.name), (
+            f"Lab recent filename should match pattern: {lab_recent_path.name}"
+        )
+        assert date_pattern.match(lab_older_path.name), (
+            f"Lab older filename should match pattern: {lab_older_path.name}"
+        )
 
         # Test imaging report patterns: YYYYMMDD-imaging-N.md
         imaging_recent_path = get_fixture_path("imaging", "recent")
@@ -192,12 +170,12 @@ class TestMedicalDataIntegration:
 
         imaging_pattern = re.compile(r"^\d{8}-imaging-\d+\.md$")
 
-        assert imaging_pattern.match(
-            imaging_recent_path.name
-        ), f"Imaging recent filename should match pattern: {imaging_recent_path.name}"
-        assert imaging_pattern.match(
-            imaging_older_path.name
-        ), f"Imaging older filename should match pattern: {imaging_older_path.name}"
+        assert imaging_pattern.match(imaging_recent_path.name), (
+            f"Imaging recent filename should match pattern: {imaging_recent_path.name}"
+        )
+        assert imaging_pattern.match(imaging_older_path.name), (
+            f"Imaging older filename should match pattern: {imaging_older_path.name}"
+        )
 
     @pytest.mark.integration
     def test_converter_with_fixture_content(self, temp_dir, sample_lab_report_recent):
@@ -212,16 +190,12 @@ class TestMedicalDataIntegration:
         mock_pdf.write_bytes(b"%PDF-1.4 mock pdf content")
 
         # Test the converter
-        converter = PDFToMarkdownConverter(
-            str(input_dir), str(output_dir), enhanced_mode=False
-        )
+        converter = PDFToMarkdownConverter(str(input_dir), str(output_dir), enhanced_mode=False)
 
         # Mock pymupdf4llm to return our fixture content
         with patch("wellbin.core.converter.pymupdf4llm.to_markdown") as mock_to_md:
             # Return content similar to our fixtures but without the header (since that's added by the converter)
-            fixture_lines = sample_lab_report_recent.split("\n")[
-                7:
-            ]  # Skip the header part
+            fixture_lines = sample_lab_report_recent.split("\n")[7:]  # Skip the header part
             mock_content = "\n".join(fixture_lines)
             mock_to_md.return_value = mock_content
 
@@ -237,9 +211,7 @@ class TestMedicalDataIntegration:
             assert "20230615-lab-0" in content
             assert "HEMOGRAMA COMPLETO" in content
 
-    def test_structured_directories_with_fixture_layout(
-        self, medical_fixtures_dir, temp_dir
-    ):
+    def test_structured_directories_with_fixture_layout(self, medical_fixtures_dir, temp_dir):
         """Test that structured conversion works with fixture directory layout."""
         # Create a structured input directory similar to the fixture layout
         input_dir = temp_dir / "input"
@@ -261,9 +233,7 @@ class TestMedicalDataIntegration:
         output_dir = temp_dir / "output"
 
         # Mock the actual conversion process
-        with patch(
-            "wellbin.core.converter.PDFToMarkdownConverter"
-        ) as mock_converter_class:
+        with patch("wellbin.core.converter.PDFToMarkdownConverter") as mock_converter_class:
             mock_converter = mock_converter_class.return_value
             mock_converter.convert_all_pdfs.return_value = [Path("dummy.md")]
 

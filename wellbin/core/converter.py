@@ -8,7 +8,7 @@ to markdown format optimized for LLM consumption.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import pymupdf4llm
 
@@ -35,9 +35,7 @@ class PDFToMarkdownConverter:
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def medical_header_detector(
-        self, span: Dict[str, Any], page: Optional[Any] = None
-    ) -> str:
+    def medical_header_detector(self, span: dict[str, Any], page: Optional[Any] = None) -> str:
         """
         Custom header detection optimized for medical documents
 
@@ -121,9 +119,7 @@ class PDFToMarkdownConverter:
 
         return ""
 
-    def extract_enhanced_markdown(
-        self, pdf_path: Path
-    ) -> Optional[Union[str, List[Dict[str, Any]]]]:
+    def extract_enhanced_markdown(self, pdf_path: Path) -> Optional[Union[str, list[dict[str, Any]]]]:
         """Extract markdown with all advanced PyMuPDF4LLM features"""
         try:
             if self.enhanced_mode:
@@ -141,19 +137,15 @@ class PDFToMarkdownConverter:
                 return chunks
             else:
                 # Simple extraction (current behavior)
-                return pymupdf4llm.to_markdown(
-                    str(pdf_path), hdr_info=self.medical_header_detector
-                )
+                return pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector)
 
         except Exception as e:
             print(f"❌ Error extracting markdown from {pdf_path}: {e}")
             return None
 
-    def save_enhanced_chunks(
-        self, chunks: Union[str, List[Dict[str, Any]]], pdf_path: Path
-    ) -> List[Path]:
+    def save_enhanced_chunks(self, chunks: Union[str, list[dict[str, Any]]], pdf_path: Path) -> list[Path]:
         """Save enhanced page chunks embedded in a single markdown file"""
-        converted_files: List[Path] = []
+        converted_files: list[Path] = []
         base_name = pdf_path.stem
 
         if isinstance(chunks, list):
@@ -162,8 +154,8 @@ class PDFToMarkdownConverter:
             output_path = self.output_dir / output_filename
 
             # Build the complete document with embedded chunks
-            content_parts: List[str] = []
-            all_words: List[Any] = []
+            content_parts: list[str] = []
+            all_words: list[Any] = []
 
             # Document header with overall metadata
             total_pages = len(chunks)
@@ -178,7 +170,7 @@ class PDFToMarkdownConverter:
             header = f"""# Medical Report: {base_name}
 
 **Source File:** `{base_name}.pdf`
-**Extracted:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Extracted:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **Processor:** PyMuPDF4LLM Enhanced Mode
 **Optimized:** LLM medical data consumption
 **Total Pages:** {total_pages}
@@ -256,7 +248,7 @@ Total words: {len(all_words)}
             header = f"""# Medical Report: {base_name}
 
 **Source File:** `{base_name}.pdf`
-**Extracted:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Extracted:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **Processor:** PyMuPDF4LLM Standard Mode
 
 ---
@@ -272,14 +264,12 @@ Total words: {len(all_words)}
 
         return converted_files
 
-    def convert_pdf_to_markdown(self, pdf_path: Path) -> Optional[List[Path]]:
+    def convert_pdf_to_markdown(self, pdf_path: Path) -> Optional[list[Path]]:
         """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features"""
         try:
             print(f"📄 Converting {pdf_path.name}...")
             if self.enhanced_mode:
-                print(
-                    "  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)"
-                )
+                print("  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)")
 
             # Extract markdown with advanced features
             result = self.extract_enhanced_markdown(pdf_path)
@@ -294,9 +284,7 @@ Total words: {len(all_words)}
             print(f"  ✅ Saved {len(converted_files)} files ({total_size:,} bytes)")
 
             if self.enhanced_mode and isinstance(result, list):
-                print(
-                    f"  📊 Processed {len(result)} pages with rich metadata (embedded in single file)"
-                )
+                print(f"  📊 Processed {len(result)} pages with rich metadata (embedded in single file)")
 
                 # Show detected features (no images)
                 total_tables = sum(len(chunk.get("tables", [])) for chunk in result)
@@ -305,9 +293,7 @@ Total words: {len(all_words)}
                 if total_tables > 0:
                     print(f"  📋 Found {total_tables} tables across all pages")
                 if total_words > 0:
-                    print(
-                        f"  📝 Extracted {total_words} words with positions (embedded in footer)"
-                    )
+                    print(f"  📝 Extracted {total_words} words with positions (embedded in footer)")
 
             return converted_files
 
@@ -315,7 +301,7 @@ Total words: {len(all_words)}
             print(f"  ❌ Error converting {pdf_path.name}: {e}")
             return None
 
-    def convert_all_pdfs(self) -> List[Path]:
+    def convert_all_pdfs(self) -> list[Path]:
         """Convert all PDFs in the directory with enhanced features"""
         if not self.pdf_dir.exists():
             print(f"❌ PDF directory {self.pdf_dir} not found")
@@ -328,18 +314,14 @@ Total words: {len(all_words)}
             print(f"❌ No PDF files found in {self.pdf_dir}")
             return []
 
-        mode_desc = (
-            "Enhanced (embedded chunks + tables + words)"
-            if self.enhanced_mode
-            else "Standard"
-        )
+        mode_desc = "Enhanced (embedded chunks + tables + words)" if self.enhanced_mode else "Standard"
         print(f"🔄 Found {len(pdf_files)} PDF files to convert")
         print(f"🎯 Mode: {mode_desc}")
         print(f"📁 Output directory: {self.output_dir}")
         print("=" * 60)
 
-        all_converted_files: List[Path] = []
-        failed_conversions: List[Path] = []
+        all_converted_files: list[Path] = []
+        failed_conversions: list[Path] = []
 
         for pdf_path in sorted(pdf_files):
             result = self.convert_pdf_to_markdown(pdf_path)
@@ -352,9 +334,7 @@ Total words: {len(all_words)}
         print("\n" + "=" * 60)
         print("🎉 CONVERSION COMPLETE!")
         print("=" * 60)
-        print(
-            f"✅ Successfully converted: {len(pdf_files) - len(failed_conversions)} PDFs"
-        )
+        print(f"✅ Successfully converted: {len(pdf_files) - len(failed_conversions)} PDFs")
         print(f"📄 Total markdown files: {len(all_converted_files)}")
 
         if failed_conversions:
@@ -366,9 +346,7 @@ Total words: {len(all_words)}
             total_size = sum(f.stat().st_size for f in all_converted_files)
             print("\n📊 Results:")
             print(f"   📁 Output directory: {self.output_dir}")
-            print(
-                f"   💾 Total size: {total_size:,} bytes ({total_size/1024/1024:.2f} MB)"
-            )
+            print(f"   💾 Total size: {total_size:,} bytes ({total_size / 1024 / 1024:.2f} MB)")
 
             if self.enhanced_mode:
                 print("   🎯 Enhanced features: ✓")
@@ -380,13 +358,13 @@ Total words: {len(all_words)}
 
 def convert_structured_directories(
     input_dir: str, output_dir: str, file_type: str, enhanced_mode: bool = False
-) -> List[Path]:
+) -> list[Path]:
     """Convert PDFs from structured directories maintaining organization"""
-    converted_files: List[Path] = []
+    converted_files: list[Path] = []
     input_path = Path(input_dir)
 
     # Define subdirectory mappings
-    type_mapping: Dict[str, str] = {"lab_reports": "lab", "imaging_reports": "imaging"}
+    type_mapping: dict[str, str] = {"lab_reports": "lab", "imaging_reports": "imaging"}
 
     for subdir in input_path.iterdir():
         if not subdir.is_dir():
@@ -407,9 +385,7 @@ def convert_structured_directories(
         output_subdir.mkdir(parents=True, exist_ok=True)
 
         # Convert PDFs in this subdirectory with enhanced mode
-        converter = PDFToMarkdownConverter(
-            str(subdir), str(output_subdir), enhanced_mode
-        )
+        converter = PDFToMarkdownConverter(str(subdir), str(output_subdir), enhanced_mode)
         subdir_files = converter.convert_all_pdfs()
         converted_files.extend(subdir_files)
 

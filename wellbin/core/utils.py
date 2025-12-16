@@ -6,20 +6,18 @@ Contains common helper functions used across the package.
 
 import os
 from pathlib import Path
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional
 
 
-def get_env_default(
-    env_var: str, fallback: Any, convert_type: Optional[Callable[[str], Any]] = None
-) -> Any:
+def get_env_default(env_var: str, fallback: Any, convert_type: Optional[Callable[[str], Any]] = None) -> Any:
     """Helper to get environment variable with proper empty value handling"""
     value = os.getenv(env_var, "").strip()
     if not value:
         value = fallback
 
-    if convert_type == int:
+    if convert_type is int:
         return int(value)
-    elif convert_type == bool:
+    elif convert_type is bool:
         if isinstance(value, bool):
             return value
         return str(value).lower() in ("true", "1", "yes", "on")
@@ -51,9 +49,9 @@ def get_env_or_default(
         result = value
 
     # Apply type conversion
-    if convert_type == int:
+    if convert_type is int:
         return int(result)
-    elif convert_type == bool:
+    elif convert_type is bool:
         if isinstance(result, bool):
             return result
         return str(result).lower() in ("true", "1", "yes", "on")
@@ -165,15 +163,13 @@ WELLBIN_ENHANCED_MODE=false
         click.echo("4. Convert PDFs to markdown:")
         click.echo("   uv run wellbin convert")
         click.echo()
-        click.echo(
-            "💡 All settings in .env can be overridden with command line options."
-        )
+        click.echo("💡 All settings in .env can be overridden with command line options.")
 
     except Exception as e:
         click.echo(f"❌ Error creating configuration file: {e}")
 
 
-def validate_credentials(email: str, password: str) -> Tuple[bool, str]:
+def validate_credentials(email: str, password: str) -> tuple[bool, str]:
     """Validate that credentials are provided and not default values"""
     if not email or email == "your-email@example.com":
         return False, "Email not configured. Please set WELLBIN_EMAIL or use --email"

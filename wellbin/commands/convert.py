@@ -79,31 +79,19 @@ def convert(
     # Only use environment variables when CLI argument is NOT provided
 
     final_input_dir: str = (
-        input_dir
-        if input_dir is not None
-        else get_env_or_default("WELLBIN_INPUT_DIR", "medical_data")
+        input_dir if input_dir is not None else get_env_or_default("WELLBIN_INPUT_DIR", "medical_data")
     )
     final_output_dir: str = (
-        output_dir
-        if output_dir is not None
-        else get_env_or_default("WELLBIN_MARKDOWN_DIR", "markdown_reports")
+        output_dir if output_dir is not None else get_env_or_default("WELLBIN_MARKDOWN_DIR", "markdown_reports")
     )
-    final_file_type: str = (
-        file_type
-        if file_type is not None
-        else get_env_or_default("WELLBIN_FILE_TYPE", "all")
-    )
+    final_file_type: str = file_type if file_type is not None else get_env_or_default("WELLBIN_FILE_TYPE", "all")
 
     # For flags: True if flag is provided, otherwise check env var, otherwise False
     final_preserve_structure: bool = (
-        preserve_structure
-        if preserve_structure
-        else get_env_or_default("WELLBIN_PRESERVE_STRUCTURE", "true", bool)
+        preserve_structure if preserve_structure else get_env_or_default("WELLBIN_PRESERVE_STRUCTURE", "true", bool)
     )
     final_enhanced_mode: bool = (
-        enhanced_mode
-        if enhanced_mode
-        else get_env_or_default("WELLBIN_ENHANCED_MODE", "false", bool)
+        enhanced_mode if enhanced_mode else get_env_or_default("WELLBIN_ENHANCED_MODE", "false", bool)
     )
 
     click.echo("🔄 PDF to Markdown Converter for Medical Reports")
@@ -118,18 +106,14 @@ def convert(
     if final_preserve_structure:
         click.echo("📁 Preserving subdirectory structure")
     if final_enhanced_mode:
-        click.echo(
-            "🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)"
-        )
+        click.echo("🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)")
 
     # Show precedence information
     click.echo("\n🔧 Argument Sources:")
     click.echo(f"   Input dir: {'CLI' if input_dir else 'ENV/Default'}")
     click.echo(f"   Output dir: {'CLI' if output_dir else 'ENV/Default'}")
     click.echo(f"   File type: {'CLI' if file_type else 'ENV/Default'}")
-    click.echo(
-        f"   Preserve structure: {'CLI' if preserve_structure else 'ENV/Default'}"
-    )
+    click.echo(f"   Preserve structure: {'CLI' if preserve_structure else 'ENV/Default'}")
     click.echo(f"   Enhanced mode: {'CLI' if enhanced_mode else 'ENV/Default'}")
     click.echo()
 
@@ -142,33 +126,21 @@ def convert(
         )
     else:
         # Create converter and run conversion on flat directory
-        converter = PDFToMarkdownConverter(
-            final_input_dir, final_output_dir, final_enhanced_mode
-        )
+        converter = PDFToMarkdownConverter(final_input_dir, final_output_dir, final_enhanced_mode)
         converted_files = converter.convert_all_pdfs()
 
     if converted_files:
         click.echo("\n💡 LLM Usage Examples:")
         click.echo(f"   📖 Read a report: cat {final_output_dir}/20250604-lab-0.md")
         click.echo(f"   🔍 Search all reports: grep -r 'keyword' {final_output_dir}/")
-        click.echo(
-            f"   📊 Count total reports: find {final_output_dir} -name '*.md' | wc -l"
-        )
-        click.echo(
-            f"   🤖 Feed to LLM: cat {final_output_dir}/**/*.md | llm 'analyze trends'"
-        )
-        click.echo(
-            f"   📈 Extract lab values: grep -h 'mg/dL\\|g/dL' {final_output_dir}/**/*.md"
-        )
-        click.echo(
-            f"   🔬 Find abnormal: grep -i 'alto\\|bajo\\|high\\|low' {final_output_dir}/**/*.md"
-        )
+        click.echo(f"   📊 Count total reports: find {final_output_dir} -name '*.md' | wc -l")
+        click.echo(f"   🤖 Feed to LLM: cat {final_output_dir}/**/*.md | llm 'analyze trends'")
+        click.echo(f"   📈 Extract lab values: grep -h 'mg/dL\\|g/dL' {final_output_dir}/**/*.md")
+        click.echo(f"   🔬 Find abnormal: grep -i 'alto\\|bajo\\|high\\|low' {final_output_dir}/**/*.md")
 
         if final_enhanced_mode:
             click.echo("\n🎯 Enhanced Mode Features:")
-            click.echo(
-                "   📑 Page chunks: Embedded as sections in single markdown files"
-            )
+            click.echo("   📑 Page chunks: Embedded as sections in single markdown files")
             click.echo("   📊 Word positions: Embedded in hidden footer sections")
             click.echo("   📋 Table detection: Built-in with position data")
             click.echo("   🧠 Medical headers: Optimized for lab/imaging reports")

@@ -21,13 +21,13 @@ uv pip install -e .
 ### Code Quality and Testing
 ```bash
 # Run linting
-uv run flake8 wellbin/
-uv run black --check wellbin/
-uv run isort --check-only wellbin/
+uv run ruff check wellbin/
 
 # Auto-format code
-uv run black wellbin/
-uv run isort wellbin/
+uv run ruff format wellbin/
+
+# Run linting with auto-fix
+uv run ruff check --fix wellbin/
 
 # Run type checking
 uv run pyright wellbin/
@@ -498,17 +498,29 @@ The application provides comprehensive status reporting:
 
 **Purpose:** Automated code quality enforcement using Git pre-commit hooks.
 
-**Local Hooks (using uv):**
-- **black**: Code formatting with `uv run black`
-- **isort**: Import sorting with `uv run isort --profile black`
-- **flake8**: Linting with `uv run flake8` (excludes `.venv/`)
+**Configuration Features:**
+- **minimum_pre_commit_version**: Ensures compatibility (3.0.0+)
+- **fail_fast: false**: Runs all hooks even if one fails
 
-**External Hooks:**
+**Ruff Hooks (Official ruff-pre-commit repo):**
+- **ruff lint**: Fast linting with auto-fix and exit-non-zero-on-fix
+- **ruff format**: Code formatting for Python and stub files
+
+**File Validation Hooks:**
 - **trailing-whitespace**: Remove trailing whitespace
 - **end-of-file-fixer**: Ensure files end with newline
 - **check-yaml**: Validate YAML syntax
+- **check-toml**: Validate TOML files (pyproject.toml)
+- **check-json**: Validate JSON files
 - **check-added-large-files**: Prevent large file commits
 - **check-merge-conflict**: Detect merge conflict markers
+- **check-case-conflict**: Prevent case-sensitive filename issues
+- **mixed-line-ending**: Enforce LF line endings
+
+**Python-Specific Hooks (pygrep-hooks):**
+- **python-check-blanket-noqa**: Prevent blanket `# noqa` comments
+- **python-check-blanket-type-ignore**: Prevent blanket `# type: ignore` comments
+- **python-use-type-annotations**: Enforce type annotations over type comments
 
 **Setup and Usage:**
 ```bash
