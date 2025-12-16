@@ -19,8 +19,9 @@ Wellbin Medical Data Downloader is a comprehensive Python tool for downloading a
 - **PDF Processing**: pymupdf4llm for medical-optimized conversion
 - **Configuration**: python-dotenv for environment variable management
 - **Testing**: pytest with coverage, mocking, and integration tests
-- **Code Quality**: Black, isort, flake8, pyright, bandit, safety
+- **Code Quality**: Ruff (linting + formatting), pyright, bandit, safety
 - **Pre-commit Hooks**: Automated code quality enforcement
+- **Testing**: pytest (88 tests, 67.73% coverage)
 
 ## Architecture Components
 

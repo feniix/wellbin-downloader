@@ -7,18 +7,16 @@
 #### Formatting
 ```bash
 # Auto-format code
-uv run black wellbin/
-uv run isort wellbin/
+uv run ruff format wellbin/
 ```
 
 #### Linting
 ```bash
 # Check for linting errors
-uv run flake8 wellbin/
+uv run ruff check wellbin/
 
 # Verify formatting
-uv run black --check wellbin/
-uv run isort --check-only wellbin/
+uv run ruff format --check wellbin/
 ```
 
 #### Type Checking
@@ -73,14 +71,16 @@ uv run safety check
 uv run pre-commit run --all-files
 
 # This will run:
-# - black (formatting)
-# - isort (import sorting)
-# - flake8 (linting)
+# - ruff lint (linting with auto-fix)
+# - ruff format (code formatting)
 # - trailing-whitespace
 # - end-of-file-fixer
 # - check-yaml
+# - check-toml
+# - check-json
 # - check-added-large-files
 # - check-merge-conflict
+# - mixed-line-ending
 ```
 
 ### 5. Manual Testing (if applicable)
@@ -135,9 +135,8 @@ git commit -m "descriptive message"
 
 ## Quick Checklist
 
-- [ ] Code formatted with Black
-- [ ] Imports sorted with isort
-- [ ] No flake8 linting errors
+- [ ] Code formatted with Ruff
+- [ ] No Ruff linting errors
 - [ ] Type checking passes with pyright
 - [ ] All tests pass
 - [ ] Coverage meets minimum threshold (30%+)
@@ -152,8 +151,8 @@ git commit -m "descriptive message"
 ### Formatting Issues
 ```bash
 # Auto-fix formatting
-uv run black wellbin/
-uv run isort wellbin/
+uv run ruff format wellbin/
+uv run ruff check --fix wellbin/
 ```
 
 ### Import Errors

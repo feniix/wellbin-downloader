@@ -8,9 +8,10 @@
 - Target Python version: 3.9+
 
 ### Formatting Tools
-- **Black**: Code formatting (line length: 88)
-- **isort**: Import sorting with Black profile
-- **flake8**: Linting with extended ignore rules (E203, W503, F811)
+- **Ruff**: Fast linting and formatting (replaces Black/isort/flake8)
+- **Ruff format**: Code formatting (line length: 120)
+- **Ruff lint**: Linting with auto-fix capability
+- Line length: 120 characters (configured in pyproject.toml)
 
 ### Type Hints
 - **Strict type checking** with Pyright
@@ -19,10 +20,9 @@
 - All functions should have type annotations for parameters and return values
 
 ### Import Organization
-- Use isort with Black profile
-- Multi-line output mode: 3
-- Line length: 88
-- Known first party: ["wellbin"]
+- Ruff handles import organization (built-in, no need for isort)
+- Line length: 120 characters
+- Imports automatically organized by ruff lint --fix
 
 ### Naming Conventions
 - **Classes**: PascalCase (e.g., `WellbinMedicalDownloader`, `PDFToMarkdownConverter`)
@@ -103,11 +103,15 @@
 
 ## Pre-commit Hooks
 Automated checks run on every commit:
-- Black formatting
-- isort import sorting
-- flake8 linting
+- **ruff lint**: Fast linting with auto-fix
+- **ruff format**: Code formatting
 - Trailing whitespace removal
 - End-of-file fixer
 - YAML validation
+- TOML validation
+- JSON validation
 - Large file detection
 - Merge conflict detection
+- Case conflict detection
+- Mixed line ending detection
+- Python specific checks (blanket noqa, type ignore, type annotations)

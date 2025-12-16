@@ -184,9 +184,10 @@ Built-in delays respect platform resources:
 ### Pre-commit Hooks
 Automated quality enforcement:
 
-1. **Formatting**: Black, isort
-2. **Linting**: flake8
-3. **File checks**: trailing whitespace, end-of-file, YAML, large files, merge conflicts
+1. **Code Quality**: Ruff (linting + formatting replaces Black/isort/flake8)
+2. **File checks**: trailing whitespace, end-of-file, YAML, TOML, JSON, large files, merge conflicts
+3. **Python checks**: blanket noqa prevention, type ignore prevention, type annotations enforcement
+4. **Other checks**: case conflicts, mixed line ending detection
 
 ### Test-Driven Development
 1. Write tests first (or alongside code)
