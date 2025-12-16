@@ -174,7 +174,7 @@ def validate_credentials(email: str, password: str) -> tuple[bool, str]:
     if not email or email == "your-email@example.com":
         return False, "Email not configured. Please set WELLBIN_EMAIL or use --email"
 
-    if not password or password == "your-password":
+    if not password or password == "your-password":  # nosec
         return (
             False,
             "Password not configured. Please set WELLBIN_PASSWORD or use --password",

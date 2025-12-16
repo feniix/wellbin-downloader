@@ -118,7 +118,7 @@ class WellbinMedicalDownloader:
 
             # Navigate to login page
             print(f"📍 Navigating to: {self.login_url}")
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.login_url)
             time.sleep(2)
 
@@ -165,7 +165,7 @@ class WellbinMedicalDownloader:
         """Extract study dates from the explorer page"""
         try:
             print("📅 Extracting study dates from explorer page...")
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.explorer_url)
             time.sleep(3)
 
@@ -359,7 +359,7 @@ class WellbinMedicalDownloader:
                 "Dec": "12",
             }
 
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             # Find study elements that match our filtered links
             for href in study_links:
                 try:
@@ -448,7 +448,7 @@ class WellbinMedicalDownloader:
     def extract_date_from_study_page(self, study_url: str) -> str:
         """Extract date from the study page using the item-value report-date class"""
         try:
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             # Look for the div with class "item-value report-date"
             date_element = self.driver.find_element(By.CSS_SELECTOR, "div.item-value.report-date")
             date_text = date_element.text.strip()
@@ -507,7 +507,7 @@ class WellbinMedicalDownloader:
         try:
             print("🔍 Navigating to Explorer to find studies...")
             print(f"📍 Going to: {self.explorer_url}")
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.explorer_url)
             time.sleep(3)
 
@@ -576,7 +576,7 @@ class WellbinMedicalDownloader:
             print(f"\n[{study_index}/{total_studies}] 📄 Processing {study_type} study:")
             print(f"  🔗 URL: {study_url}")
 
-            assert self.driver is not None, "Driver should be initialized"
+            assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(study_url)
             time.sleep(1)
 
