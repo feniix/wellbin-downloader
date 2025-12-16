@@ -5,11 +5,18 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "allow": [],
+    "allow": [
+      "mcp__serena__think_about_task_adherence",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__read_memory",
+      "mcp__serena__find_symbol",
+      "mcp__serena__insert_after_symbol",
+      "mcp__exa__get_code_context_exa",
+      "Bash(uv run pytest:*)"
+    ],
     "deny": [],
     "ask": []
   },
-  "enableAllMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright",
     "mcp-pandoc",
@@ -17,5 +24,6 @@
     "serena",
     "exa",
     "ref"
-  ]
+  ],
+  "enableAllMcpServers": true
 }
