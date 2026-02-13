@@ -1,5 +1,25 @@
 {
   "mcpServers": {
+    "exa": {
+      "command": "direnv",
+      "args": [
+        "exec",
+        "${PROJECT_ROOT}",
+        "bunx",
+        "-y",
+        "exa-mcp-server"
+      ]
+    },
+    "ref": {
+      "command": "direnv",
+      "args": [
+        "exec",
+        "${PROJECT_ROOT}",
+        "bunx",
+        "-y",
+        "ref-tools-mcp@latest"
+      ]
+    },
     "playwright": {
       "type": "stdio",
       "command": "npx",
@@ -25,6 +45,13 @@
         "mcp-sequential-thinking"
       ]
     },
+    "code-reasoning": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@mettamatt/code-reasoning"
+      ]
+    },
     "serena": {
       "command": "uvx",
       "args": [
@@ -35,23 +62,7 @@
         "--context",
         "ide-assistant",
         "--project",
-        "/Users/feniix/src/personal/cursor/wellbin"
-      ]
-    },
-    "exa": {
-      "command": "direnv",
-      "args": [
-        "exec",
-        "/Users/feniix/src/personal/cursor/kinemotion",
-        "bunx", "-y", "exa-mcp-server"
-      ]
-    },
-    "ref": {
-      "command": "direnv",
-      "args": [
-        "exec",
-        "/Users/feniix/src/personal/cursor/kinemotion",
-        "bunx", "-y", "ref-tools-mcp@latest"
+        "${PROJECT_ROOT}"
       ]
     }
   }
