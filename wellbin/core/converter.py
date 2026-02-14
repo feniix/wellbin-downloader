@@ -6,11 +6,35 @@ to markdown format optimized for LLM consumption.
 """
 
 import json
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Union
 
 import pymupdf4llm
+
+
+@dataclass
+class ConversionStats:
+    """Statistics about a PDF conversion."""
+
+    pages_processed: int = 0
+    tables_found: int = 0
+    words_extracted: int = 0
+    files_created: int = 0
+    total_bytes: int = 0
+
+
+@dataclass
+class ConversionResult:
+    """Result of a batch conversion operation."""
+
+    successful: int = 0
+    failed: int = 0
+    total_files: int = 0
+    total_bytes: int = 0
+    failed_files: list[Path] = field(default_factory=list)
+    successful_files: list[Path] = field(default_factory=list)
 
 
 class PDFToMarkdownConverter:
@@ -35,89 +59,110 @@ class PDFToMarkdownConverter:
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def medical_header_detector(self, span: dict[str, Any], page: Optional[Any] = None) -> str:
-        """
-        Custom header detection optimized for medical documents
+    # Class constants for medical header detection
+    MAIN_SECTIONS: tuple[str, ...] = (
+        # English terms
+        "PATIENT INFORMATION",
+        "LABORATORY RESULTS",
+        "CLINICAL FINDINGS",
+        "INTERPRETATION",
+        "CONCLUSION",
+        "RECOMMENDATION",
+        "DIAGNOSIS",
+        "LABORATORY DATA",
+        "CHEMISTRY PANEL",
+        "HEMATOLOGY",
+        "IMAGING FINDINGS",
+        "CLINICAL HISTORY",
+        "EXAMINATION",
+        "RESULTS",
+        "FINDINGS",
+        "IMPRESSION",
+        "COMMENTS",
+        # Spanish terms
+        "HEMOGRAMA COMPLETO",
+        "RESONANCIA MAGNETICA",
+        "TIEMPO DE PROTROMBINA",
+        "ERITROSEDIMENTACION",
+        "FERRITINA",
+        "APTT",
+        "DIAGNOSTICO POR IMAGENES",
+        "ESTUDIO",
+    )
 
-        Recognizes common medical report sections and subsections
+    SUBSECTIONS: tuple[str, ...] = (
+        # English terms
+        "CHEMISTRY",
+        "HEMATOLOGY",
+        "LIPID PANEL",
+        "GLUCOSE",
+        "ELECTROLYTES",
+        "LIVER FUNCTION",
+        "KIDNEY FUNCTION",
+        "CARDIAC MARKERS",
+        "TUMOR MARKERS",
+        "HORMONES",
+        "VITAMINS",
+        "PROTEINS",
+        "CBC",
+        "DIFFERENTIAL",
+        "PLATELET",
+        "COAGULATION",
+        # Spanish terms
+        "SERIE ERITROCITARIA",
+        "SERIE LEUCOCITARIA",
+        "SERIE TROMBOCITARIA",
+        "METODO",
+        "CONCENTRACION",
+    )
+
+    def medical_header_detector(self, span: dict[str, Any], page: Optional[Any] = None) -> str:
+        """Custom header detection optimized for medical documents.
+
+        Recognizes common medical report sections and subsections.
+
+        Args:
+            span: Text span dictionary with 'text', 'size', and 'font' keys
+            page: Optional page object (unused but required by PyMuPDF4LLM)
+
+        Returns:
+            Markdown header prefix ('## ', '### ', '#### ', or '')
         """
         text = span.get("text", "").strip()
         size = span.get("size", 0)
         font = span.get("font", "").lower()
+        text_upper = text.upper()
 
-        # Main medical report sections (H2) - English and Spanish
-        main_sections = [
-            # English terms
-            "PATIENT INFORMATION",
-            "LABORATORY RESULTS",
-            "CLINICAL FINDINGS",
-            "INTERPRETATION",
-            "CONCLUSION",
-            "RECOMMENDATION",
-            "DIAGNOSIS",
-            "LABORATORY DATA",
-            "CHEMISTRY PANEL",
-            "HEMATOLOGY",
-            "IMAGING FINDINGS",
-            "CLINICAL HISTORY",
-            "EXAMINATION",
-            "RESULTS",
-            "FINDINGS",
-            "IMPRESSION",
-            "COMMENTS",
-            # Spanish terms from real medical data
-            "HEMOGRAMA COMPLETO",
-            "RESONANCIA MAGNETICA",
-            "TIEMPO DE PROTROMBINA",
-            "ERITROSEDIMENTACION",
-            "FERRITINA",
-            "APTT",
-            "DIAGNOSTICO POR IMAGENES",
-            "ESTUDIO",
-        ]
+        # Check for main sections (H2)
+        if self._is_main_section(text_upper, size, font):
+            return "## "
 
-        # Subsections (H3) - English and Spanish
-        subsections = [
-            # English terms
-            "CHEMISTRY",
-            "HEMATOLOGY",
-            "LIPID PANEL",
-            "GLUCOSE",
-            "ELECTROLYTES",
-            "LIVER FUNCTION",
-            "KIDNEY FUNCTION",
-            "CARDIAC MARKERS",
-            "TUMOR MARKERS",
-            "HORMONES",
-            "VITAMINS",
-            "PROTEINS",
-            "CBC",
-            "DIFFERENTIAL",
-            "PLATELET",
-            "COAGULATION",
-            # Spanish terms from real medical data
-            "SERIE ERITROCITARIA",
-            "SERIE LEUCOCITARIA",
-            "SERIE TROMBOCITARIA",
-            "METODO",
-            "CONCENTRACION",
-        ]
-
-        # Check for main sections
-        if any(section in text.upper() for section in main_sections):
-            if size >= 12 or "bold" in font:
-                return "## "
-
-        # Check for subsections
-        if any(section in text.upper() for section in subsections):
-            if size >= 10:
-                return "### "
+        # Check for subsections (H3)
+        if self._is_subsection(text_upper, size):
+            return "### "
 
         # Parameter headers (H4)
-        if text.endswith(":") and size >= 9:
+        if self._is_parameter_header(text, size):
             return "#### "
 
         return ""
+
+    def _is_main_section(self, text_upper: str, size: float, font: str) -> bool:
+        """Check if text is a main medical section header."""
+        if not any(section in text_upper for section in self.MAIN_SECTIONS):
+            return False
+        return size >= 12 or "bold" in font
+
+    def _is_subsection(self, text_upper: str, size: float) -> bool:
+        """Check if text is a subsection header."""
+        if not any(section in text_upper for section in self.SUBSECTIONS):
+            return False
+        return size >= 10
+
+    @staticmethod
+    def _is_parameter_header(text: str, size: float) -> bool:
+        """Check if text is a parameter header (ends with colon)."""
+        return text.endswith(":") and size >= 9
 
     def extract_enhanced_markdown(self, pdf_path: Path) -> Optional[Union[str, list[dict[str, Any]]]]:
         """Extract markdown with all advanced PyMuPDF4LLM features"""
@@ -265,35 +310,26 @@ Total words: {len(all_words)}
         return converted_files
 
     def convert_pdf_to_markdown(self, pdf_path: Path) -> Optional[list[Path]]:
-        """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features"""
-        try:
-            print(f"📄 Converting {pdf_path.name}...")
-            if self.enhanced_mode:
-                print("  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)")
+        """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features.
 
-            # Extract markdown with advanced features
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            List of created file paths, or None on failure
+        """
+        try:
+            self._print_conversion_start(pdf_path)
+
             result = self.extract_enhanced_markdown(pdf_path)
             if not result:
                 return None
 
-            # Save with appropriate format
             converted_files = self.save_enhanced_chunks(result, pdf_path)
-
-            # Show results
-            total_size = sum(f.stat().st_size for f in converted_files)
-            print(f"  ✅ Saved {len(converted_files)} files ({total_size:,} bytes)")
+            self._print_conversion_summary(converted_files)
 
             if self.enhanced_mode and isinstance(result, list):
-                print(f"  📊 Processed {len(result)} pages with rich metadata (embedded in single file)")
-
-                # Show detected features (no images)
-                total_tables = sum(len(chunk.get("tables", [])) for chunk in result)
-                total_words = sum(len(chunk.get("words", [])) for chunk in result)
-
-                if total_tables > 0:
-                    print(f"  📋 Found {total_tables} tables across all pages")
-                if total_words > 0:
-                    print(f"  📝 Extracted {total_words} words with positions (embedded in footer)")
+                self._print_feature_stats(result)
 
             return converted_files
 
@@ -301,59 +337,147 @@ Total words: {len(all_words)}
             print(f"  ❌ Error converting {pdf_path.name}: {e}")
             return None
 
+    def _print_conversion_start(self, pdf_path: Path) -> None:
+        """Print conversion start message."""
+        print(f"📄 Converting {pdf_path.name}...")
+        if self.enhanced_mode:
+            print("  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)")
+
+    def _print_conversion_summary(self, converted_files: list[Path]) -> None:
+        """Print summary of converted files."""
+        total_size = sum(f.stat().st_size for f in converted_files)
+        print(f"  ✅ Saved {len(converted_files)} files ({total_size:,} bytes)")
+
+    def _print_feature_stats(self, result: list[dict[str, Any]]) -> None:
+        """Print statistics about extracted features."""
+        stats = self._calculate_feature_stats(result)
+
+        print(f"  📊 Processed {stats.pages_processed} pages with rich metadata")
+
+        if stats.tables_found > 0:
+            print(f"  📋 Found {stats.tables_found} tables across all pages")
+        if stats.words_extracted > 0:
+            print(f"  📝 Extracted {stats.words_extracted} words with positions")
+
+    def _calculate_feature_stats(self, result: list[dict[str, Any]]) -> ConversionStats:
+        """Calculate statistics from conversion result.
+
+        Args:
+            result: List of page chunk dictionaries
+
+        Returns:
+            ConversionStats with aggregated statistics
+        """
+        stats = ConversionStats(pages_processed=len(result))
+
+        for chunk in result:
+            stats.tables_found += len(chunk.get("tables", []))
+            stats.words_extracted += len(chunk.get("words", []))
+
+        return stats
+
     def convert_all_pdfs(self) -> list[Path]:
-        """Convert all PDFs in the directory with enhanced features"""
+        """Convert all PDFs in the directory with enhanced features.
+
+        Returns:
+            List of all created file paths
+        """
+        pdf_files = self._find_pdf_files()
+        if pdf_files is None:
+            return []
+
+        self._print_batch_start(pdf_files)
+
+        result = self._process_all_pdfs(pdf_files)
+        self._print_batch_summary(result, pdf_files)
+
+        return result.successful_files
+
+    def _find_pdf_files(self) -> Optional[list[Path]]:
+        """Find all PDF files in the directory.
+
+        Returns:
+            List of PDF paths, None if directory doesn't exist or is empty
+        """
         if not self.pdf_dir.exists():
             print(f"❌ PDF directory {self.pdf_dir} not found")
-            return []
+            return None
 
-        # Find all PDF files
         pdf_files = list(self.pdf_dir.glob("*.pdf"))
-
         if not pdf_files:
             print(f"❌ No PDF files found in {self.pdf_dir}")
-            return []
+            return None
 
+        return pdf_files
+
+    def _print_batch_start(self, pdf_files: list[Path]) -> None:
+        """Print batch conversion start information."""
         mode_desc = "Enhanced (embedded chunks + tables + words)" if self.enhanced_mode else "Standard"
         print(f"🔄 Found {len(pdf_files)} PDF files to convert")
         print(f"🎯 Mode: {mode_desc}")
         print(f"📁 Output directory: {self.output_dir}")
         print("=" * 60)
 
-        all_converted_files: list[Path] = []
-        failed_conversions: list[Path] = []
+    def _process_all_pdfs(self, pdf_files: list[Path]) -> ConversionResult:
+        """Process all PDF files and return results.
+
+        Args:
+            pdf_files: List of PDF paths to process
+
+        Returns:
+            ConversionResult with success/failure statistics
+        """
+        result = ConversionResult(total_files=len(pdf_files))
+        successful_files: list[Path] = []
 
         for pdf_path in sorted(pdf_files):
-            result = self.convert_pdf_to_markdown(pdf_path)
-            if result:
-                all_converted_files.extend(result)
+            converted = self.convert_pdf_to_markdown(pdf_path)
+            if converted:
+                successful_files.extend(converted)
+                result.successful += 1
             else:
-                failed_conversions.append(pdf_path)
+                result.failed += 1
+                result.failed_files.append(pdf_path)
 
-        # Summary
+        result.successful_files = successful_files
+        result.total_bytes = sum(f.stat().st_size for f in successful_files) if successful_files else 0
+        return result
+
+    def _print_batch_summary(self, result: ConversionResult, pdf_files: list[Path]) -> None:
+        """Print batch conversion summary.
+
+        Args:
+            result: Conversion statistics
+            pdf_files: Original list of PDF files
+        """
         print("\n" + "=" * 60)
         print("🎉 CONVERSION COMPLETE!")
         print("=" * 60)
-        print(f"✅ Successfully converted: {len(pdf_files) - len(failed_conversions)} PDFs")
-        print(f"📄 Total markdown files: {len(all_converted_files)}")
+        print(f"✅ Successfully converted: {result.successful} PDFs")
+        print(f"📄 Total markdown files: {len(result.successful_files)}")
 
-        if failed_conversions:
-            print(f"❌ Failed conversions: {len(failed_conversions)} files")
-            for failed in failed_conversions:
+        if result.failed > 0:
+            print(f"❌ Failed conversions: {result.failed} files")
+            for failed in result.failed_files:
                 print(f"   - {failed.name}")
 
-        if all_converted_files:
-            total_size = sum(f.stat().st_size for f in all_converted_files)
-            print("\n📊 Results:")
-            print(f"   📁 Output directory: {self.output_dir}")
-            print(f"   💾 Total size: {total_size:,} bytes ({total_size / 1024 / 1024:.2f} MB)")
+        if result.successful > 0:
+            self._print_results_summary(result)
 
-            if self.enhanced_mode:
-                print("   🎯 Enhanced features: ✓")
-                print("   📑 Page chunks: Embedded as sections in single files")
-                print("   📊 Word positions: Embedded in footer sections")
+    def _print_results_summary(self, result: ConversionResult) -> None:
+        """Print detailed results summary.
 
-        return all_converted_files
+        Args:
+            result: Conversion statistics
+        """
+        print("\n📊 Results:")
+        print(f"   📁 Output directory: {self.output_dir}")
+        print(f"   💾 Total size: {result.total_bytes:,} bytes ({result.total_bytes / 1024 / 1024:.2f} MB)")
+
+        if self.enhanced_mode:
+            print("   🎯 Enhanced features: ✓")
+            print("   📑 Page chunks: Embedded as sections in single files")
+            print("   📊 Word positions: Embedded in footer sections")
 
 
 def convert_structured_directories(

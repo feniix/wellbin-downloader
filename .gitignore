@@ -234,4 +234,4 @@ $RECYCLE.BIN/
 
 .envrc.local
 
-!.claude/*
+.claude/settings.local.json

@@ -1,0 +1,21 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest:*)",
+      "Bash(uv run:*)",
+      "WebSearch",
+      "mcp__code-reasoning__*",
+      "mcp__exa__*",
+      "mcp__ref__*",
+      "mcp__sequential-thinking__*",
+      "mcp__serena__*"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

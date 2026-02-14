@@ -2,6 +2,7 @@
 Scrape command for downloading medical data from Wellbin platform.
 """
 
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import click
@@ -12,6 +13,216 @@ from ..core.utils import get_env_default, validate_credentials
 
 # Load environment variables
 load_dotenv()
+
+
+@dataclass
+class ScrapeConfig:
+    """Configuration for scrape command."""
+
+    email: str = ""
+    password: str = ""
+    limit: Optional[int] = None
+    study_types: list[str] = field(default_factory=lambda: ["FhirStudy"])
+    output_dir: str = "medical_data"
+    headless: bool = True
+
+    # Source tracking for display
+    email_source: str = "ENV/Default"
+    password_source: str = "ENV/Default"
+    limit_source: str = "ENV/Default"
+    types_source: str = "ENV/Default"
+    output_source: str = "ENV/Default"
+    headless_source: str = "ENV/Default"
+
+
+def resolve_config(
+    email: Optional[str],
+    password: Optional[str],
+    limit: Optional[int],
+    types: Optional[str],
+    output: Optional[str],
+    headless: Optional[bool],
+) -> ScrapeConfig:
+    """Resolve configuration from CLI args and environment variables.
+
+    Args:
+        email: CLI email argument
+        password: CLI password argument
+        limit: CLI limit argument
+        types: CLI types argument
+        output: CLI output argument
+        headless: CLI headless argument
+
+    Returns:
+        Resolved ScrapeConfig
+    """
+    config = ScrapeConfig()
+
+    # Resolve email
+    if email is not None:
+        config.email = email
+        config.email_source = "CLI"
+    else:
+        config.email = get_env_default("WELLBIN_EMAIL", "your-email@example.com")
+
+    # Resolve password
+    if password is not None:
+        config.password = password
+        config.password_source = "CLI"
+    else:
+        config.password = get_env_default("WELLBIN_PASSWORD", "your-password")
+
+    # Resolve limit
+    if limit is not None:
+        config.limit = None if limit == 0 else limit
+        config.limit_source = "CLI"
+    else:
+        limit_val = get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
+        config.limit = None if limit_val == 0 else limit_val
+
+    # Resolve types
+    if types is not None:
+        config.study_types = _parse_study_types(types)
+        config.types_source = "CLI"
+    else:
+        types_str = get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
+        config.study_types = _parse_study_types(types_str)
+
+    # Resolve output
+    if output is not None:
+        config.output_dir = output
+        config.output_source = "CLI"
+    else:
+        config.output_dir = get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
+
+    # Resolve headless
+    if headless is not None:
+        config.headless = headless
+        config.headless_source = "CLI"
+    else:
+        config.headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
+
+    return config
+
+
+def _parse_study_types(types_str: str) -> list[str]:
+    """Parse study types string into list.
+
+    Args:
+        types_str: Comma-separated study types or "all"
+
+    Returns:
+        List of study types
+    """
+    if types_str.lower() == "all":
+        return ["all"]
+    return [t.strip() for t in types_str.split(",")]
+
+
+def display_config(config: ScrapeConfig, dry_run: bool) -> None:
+    """Display configuration summary.
+
+    Args:
+        config: Scraped configuration
+        dry_run: Whether this is a dry run
+    """
+    click.echo("🚀 Wellbin Medical Data Downloader")
+    click.echo("=" * 50)
+    click.echo(f"📧 Email: {config.email}")
+    click.echo(f"🔢 Study limit: {config.limit if config.limit else 'No limit (all studies)'}")
+    click.echo(f"🎯 Study types: {', '.join(config.study_types)}")
+    click.echo(f"📁 Output directory: {config.output_dir}")
+    click.echo(f"🤖 Headless mode: {config.headless}")
+
+    if dry_run:
+        click.echo("🔍 DRY RUN MODE: Will not download files")
+
+    click.echo("\n🔧 Argument Sources:")
+    click.echo(f"   Email: {config.email_source}")
+    click.echo(f"   Password: {config.password_source}")
+    click.echo(f"   Limit: {config.limit_source}")
+    click.echo(f"   Types: {config.types_source}")
+    click.echo(f"   Output: {config.output_source}")
+    click.echo(f"   Headless: {config.headless_source}")
+    click.echo("=" * 50)
+
+
+def display_summary(
+    downloaded_files: list[dict[str, Any]],
+    downloader: WellbinMedicalDownloader,
+    output_dir: str,
+) -> None:
+    """Display download summary.
+
+    Args:
+        downloaded_files: List of downloaded file info
+        downloader: Downloader instance with study config
+        output_dir: Output directory path
+    """
+    click.echo("\n" + "=" * 60)
+    click.echo("🎉 DOWNLOAD COMPLETE!")
+    click.echo("=" * 60)
+
+    if not downloaded_files:
+        click.echo("❌ No files were downloaded")
+        return
+
+    by_type = _group_files_by_type(downloaded_files)
+
+    click.echo(f"✅ Successfully downloaded {len(downloaded_files)} files:")
+
+    for study_type, files in by_type.items():
+        _display_type_summary(study_type, files, downloader)
+
+    _display_directory_structure(by_type, downloader, output_dir)
+    _display_next_steps(output_dir)
+
+
+def _group_files_by_type(files: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group downloaded files by study type."""
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for file_info in files:
+        study_type = file_info["study_type"]
+        if study_type not in by_type:
+            by_type[study_type] = []
+        by_type[study_type].append(file_info)
+    return by_type
+
+
+def _display_type_summary(
+    study_type: str,
+    files: list[dict[str, Any]],
+    downloader: WellbinMedicalDownloader,
+) -> None:
+    """Display summary for a single study type."""
+    config = downloader.study_config.get(study_type, {"icon": "📄", "description": study_type})
+    click.echo(f"\n{config['icon']} {config['description']} ({len(files)} files):")
+
+    for i, file_info in enumerate(files, 1):
+        click.echo(f"  {i}. 📄 {file_info['local_path']}")
+        click.echo(f"     📅 Study date: {file_info['study_date']}")
+        click.echo(f"     📝 Description: {file_info['description']}")
+
+
+def _display_directory_structure(
+    by_type: dict[str, list[dict[str, Any]]],
+    downloader: WellbinMedicalDownloader,
+    output_dir: str,
+) -> None:
+    """Display organized directory structure."""
+    click.echo(f"\n📁 Files organized in {output_dir}/:")
+
+    for study_type in by_type.keys():
+        config = downloader.study_config.get(study_type, {"subdir": "unknown", "icon": "📄"})
+        file_count = len(by_type[study_type])
+        click.echo(f"  {config['icon']} {config['subdir']}/  ({file_count} files)")
+
+
+def _display_next_steps(output_dir: str) -> None:
+    """Display next steps for the user."""
+    click.echo("\n💡 Next steps:")
+    click.echo("   📄 Convert to markdown: uv run wellbin convert")
+    click.echo(f"   🔍 View files: ls -la {output_dir}/*/")
 
 
 @click.command()
@@ -83,56 +294,16 @@ def scrape(
         # Dry run to see what would be downloaded
         uv run wellbin scrape --dry-run --types DicomStudy
     """
-
-    # PROPER PRECEDENCE: CLI args override env vars override defaults
-    final_email: str = email if email is not None else get_env_default("WELLBIN_EMAIL", "your-email@example.com")
-    final_password: str = password if password is not None else get_env_default("WELLBIN_PASSWORD", "your-password")
-    final_limit: int = limit if limit is not None else get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
-    final_types: str = types if types is not None else get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
-    final_output: str = output if output is not None else get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
-
-    # For boolean flags: True/False if provided, otherwise check env var, otherwise default
-    if headless is not None:
-        final_headless: bool = headless
-    else:
-        final_headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
+    config = resolve_config(email, password, limit, types, output, headless)
 
     # Validate credentials
-    is_valid, message = validate_credentials(final_email, final_password)
+    is_valid, message = validate_credentials(config.email, config.password)
     if not is_valid:
         click.echo(f"❌ {message}")
         click.echo("💡 Use 'uv run wellbin config' to create a configuration file")
         return
 
-    # Parse study types
-    if final_types.lower() == "all":
-        study_types = ["all"]
-    else:
-        study_types = [t.strip() for t in final_types.split(",")]
-
-    # Convert limit
-    final_limit_optional: Optional[int] = None if final_limit == 0 else final_limit
-
-    # Display configuration
-    click.echo("🚀 Wellbin Medical Data Downloader")
-    click.echo("=" * 50)
-    click.echo(f"📧 Email: {final_email}")
-    click.echo(f"🔢 Study limit: {final_limit_optional if final_limit_optional else 'No limit (all studies)'}")
-    click.echo(f"🎯 Study types: {', '.join(study_types)}")
-    click.echo(f"📁 Output directory: {final_output}")
-    click.echo(f"🤖 Headless mode: {final_headless}")
-    if dry_run:
-        click.echo("🔍 DRY RUN MODE: Will not download files")
-
-    # Show precedence information
-    click.echo("\n🔧 Argument Sources:")
-    click.echo(f"   Email: {'CLI' if email else 'ENV/Default'}")
-    click.echo(f"   Password: {'CLI' if password else 'ENV/Default'}")
-    click.echo(f"   Limit: {'CLI' if limit is not None else 'ENV/Default'}")
-    click.echo(f"   Types: {'CLI' if types else 'ENV/Default'}")
-    click.echo(f"   Output: {'CLI' if output else 'ENV/Default'}")
-    click.echo(f"   Headless: {'CLI' if headless is not None else 'ENV/Default'}")
-    click.echo("=" * 50)
+    display_config(config, dry_run)
 
     if dry_run:
         click.echo("\n⚠️  This is a dry run. No files will be downloaded.")
@@ -141,51 +312,13 @@ def scrape(
 
     # Create and run downloader
     downloader = WellbinMedicalDownloader(
-        email=final_email,
-        password=final_password,
-        headless=final_headless,
-        limit_studies=final_limit_optional,
-        study_types=study_types,
-        output_dir=final_output,
+        email=config.email,
+        password=config.password,
+        headless=config.headless,
+        limit_studies=config.limit,
+        study_types=config.study_types,
+        output_dir=config.output_dir,
     )
 
     downloaded_files = downloader.scrape_studies()
-
-    # Summary
-    click.echo("\n" + "=" * 60)
-    click.echo("🎉 DOWNLOAD COMPLETE!")
-    click.echo("=" * 60)
-
-    # Group by study type for summary
-    by_type: dict[str, list[dict[str, Any]]] = {}
-
-    if downloaded_files:
-        click.echo(f"✅ Successfully downloaded {len(downloaded_files)} files:")
-
-        for file_info in downloaded_files:
-            study_type = file_info["study_type"]
-            if study_type not in by_type:
-                by_type[study_type] = []
-            by_type[study_type].append(file_info)
-
-        for study_type, files in by_type.items():
-            config = downloader.study_config.get(study_type, {"icon": "📄", "description": study_type})
-            click.echo(f"\n{config['icon']} {config['description']} ({len(files)} files):")
-            for i, file_info in enumerate(files, 1):
-                click.echo(f"  {i}. 📄 {file_info['local_path']}")
-                click.echo(f"     📅 Study date: {file_info['study_date']}")
-                click.echo(f"     📝 Description: {file_info['description']}")
-    else:
-        click.echo("❌ No files were downloaded")
-
-    # Show organized directory structure
-    if downloaded_files:
-        click.echo(f"\n📁 Files organized in {final_output}/:")
-        for study_type in by_type.keys():
-            config = downloader.study_config.get(study_type, {"subdir": "unknown", "icon": "📄"})
-            file_count = len(by_type[study_type])
-            click.echo(f"  {config['icon']} {config['subdir']}/  ({file_count} files)")
-
-        click.echo("\n💡 Next steps:")
-        click.echo("   📄 Convert to markdown: uv run wellbin convert")
-        click.echo(f"   🔍 View files: ls -la {final_output}/*/")
+    display_summary(downloaded_files, downloader, config.output_dir)

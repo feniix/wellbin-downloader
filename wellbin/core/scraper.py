@@ -9,6 +9,7 @@ import os
 import re
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import requests
@@ -17,6 +18,31 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+
+
+@dataclass
+class PDFDownloadInfo:
+    """Structured data for PDF download information."""
+
+    url: str
+    text: str
+    study_url: str
+    study_type: str
+    study_date: str
+    study_index: int = 0
+
+
+@dataclass
+class DownloadResult:
+    """Result of a successful PDF download."""
+
+    local_path: str
+    original_url: str
+    study_url: str
+    study_type: str
+    study_date: str
+    description: str
+    study_index: int = 0
 
 
 class WellbinMedicalDownloader:
@@ -60,6 +86,32 @@ class WellbinMedicalDownloader:
             },
         }
 
+    # Class constants for date handling
+    DATE_PATTERNS: list[str] = [
+        r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",  # MM/DD/YYYY or DD/MM/YYYY
+        r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",  # YYYY/MM/DD
+        r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",  # DD Mon YYYY
+        r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",  # Mon DD, YYYY
+    ]
+
+    MONTH_MAP: dict[str, str] = {
+        "Jan": "01",
+        "Feb": "02",
+        "Mar": "03",
+        "Apr": "04",
+        "May": "05",
+        "Jun": "06",
+        "Jul": "07",
+        "Aug": "08",
+        "Sep": "09",
+        "Oct": "10",
+        "Nov": "11",
+        "Dec": "12",
+    }
+
+    DEFAULT_DATE: str = "20240101"
+    KNOWN_STUDY_TYPES: tuple[str, ...] = ("FhirStudy", "DicomStudy")
+
     @staticmethod
     def _is_valid_date(year: int, month: int, day: int) -> bool:
         """Validate that date components form a valid calendar date."""
@@ -87,6 +139,22 @@ class WellbinMedicalDownloader:
         # For strings with both quotes, use concat() function
         parts = s.split("'")
         return "concat('" + "', \"'\", '".join(parts) + "')"
+
+    def _matches_study_type(self, href: str, study_types: list[str]) -> bool:
+        """Check if a URL matches any of the specified study types.
+
+        Args:
+            href: URL to check
+            study_types: List of study types to match (e.g., ["FhirStudy"], ["all"])
+
+        Returns:
+            True if URL matches any study type filter
+        """
+        if "all" in study_types:
+            # Check if it's any of the known study types
+            return any(f"type={st}" in href for st in self.KNOWN_STUDY_TYPES)
+
+        return any(f"type={study_type}" in href for study_type in study_types)
 
     def setup_driver(self) -> None:
         """Setup Chrome driver with appropriate options"""
@@ -162,94 +230,18 @@ class WellbinMedicalDownloader:
             return False
 
     def extract_study_dates_from_explorer(self) -> bool:
-        """Extract study dates from the explorer page"""
+        """Extract study dates from the explorer page."""
         try:
             print("📅 Extracting study dates from explorer page...")
             assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.explorer_url)
             time.sleep(3)
 
-            # Look for date patterns in the page
-            # Common date patterns to look for
-            date_patterns = [
-                r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",  # MM/DD/YYYY or DD/MM/YYYY
-                r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",  # YYYY/MM/DD
-                r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",  # DD Mon YYYY
-                r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",  # Mon DD, YYYY
-            ]
-
-            month_map = {
-                "Jan": "01",
-                "Feb": "02",
-                "Mar": "03",
-                "Apr": "04",
-                "May": "05",
-                "Jun": "06",
-                "Jul": "07",
-                "Aug": "08",
-                "Sep": "09",
-                "Oct": "10",
-                "Nov": "11",
-                "Dec": "12",
-            }
-
-            # Find all study links and their associated dates
             study_elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, '/study/')]")
-
             print(f"🔍 Found {len(study_elements)} study elements, extracting dates...")
 
             for element in study_elements:
-                try:
-                    href = element.get_attribute("href")
-                    if not href or "study/" not in href:
-                        continue
-
-                    # Get the parent container to look for dates nearby
-                    parent_xpath = (
-                        "./ancestor::*[contains(@class, 'study') or "
-                        "contains(@class, 'card') or "
-                        "contains(@class, 'item') or "
-                        "contains(@class, 'row')][1]"
-                    )
-                    parent = element.find_element(By.XPATH, parent_xpath)
-                    container_text = parent.text if parent else element.text
-
-                    # Also check siblings and nearby elements
-                    try:
-                        # Look for date in various nearby elements (using sanitized XPath)
-                        href_xpath = self._sanitize_xpath_string(href)
-                        date_pattern = "contains(text(), '202') or contains(text(), '201')"
-                        nearby_xpath = f"//a[@href={href_xpath}]/ancestor::*[1]//*[{date_pattern}]"
-                        nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
-                        for nearby in nearby_elements:
-                            container_text += " " + nearby.text
-                    except Exception as e:  # noqa: S110
-                        print(f"    ⚠️  Could not extract nearby date elements: {type(e).__name__}")
-
-                    # Extract date from the container text
-                    study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
-
-                    if study_date:
-                        self.study_dates[href] = study_date
-                        print(f"  📅 {href} -> {study_date}")
-                    else:
-                        # Fallback: extract from URL or use current date
-                        study_id_match = re.search(r"/study/([^?]+)", href)
-                        if study_id_match:
-                            study_id = study_id_match.group(1)
-                            # Try to extract date from study ID (some IDs contain timestamps)
-                            fallback_date = self.extract_date_from_study_id(study_id)
-                            if fallback_date:
-                                self.study_dates[href] = fallback_date
-                                print(f"  📅 {href} -> {fallback_date} (from ID)")
-                            else:
-                                # Use a default date pattern
-                                self.study_dates[href] = "20240101"  # Default fallback
-                                print(f"  ⚠️  {href} -> 20240101 (fallback)")
-
-                except Exception as e:
-                    print(f"  ❌ Error extracting date for element: {type(e).__name__}: {e}")
-                    continue
+                self._extract_date_from_study_element(element)
 
             print(f"📊 Extracted dates for {len(self.study_dates)} studies")
             return True
@@ -261,53 +253,164 @@ class WellbinMedicalDownloader:
             print(f"Traceback: {traceback.format_exc()}")
             return False
 
-    def parse_date_from_text(self, text: str, date_patterns: list[str], month_map: dict[str, str]) -> Optional[str]:
-        """Parse date from text using various patterns"""
-        for pattern in date_patterns:
+    def _extract_date_from_study_element(self, element: Any) -> None:
+        """Extract date from a single study element.
+
+        Args:
+            element: Selenium WebElement for the study link
+        """
+        try:
+            href = element.get_attribute("href")
+            if not href or "study/" not in href:
+                return
+
+            container_text = self._get_study_container_text(element, href)
+
+            # Try to parse date from container text
+            study_date = self.parse_date_from_text(container_text)
+
+            if not study_date:
+                # Fallback to ID extraction or default
+                study_date = self._get_fallback_date(href)
+
+            self.study_dates[href] = study_date
+            self._log_date_extraction(href, study_date)
+
+        except Exception as e:
+            print(f"  ❌ Error extracting date for element: {type(e).__name__}: {e}")
+
+    def _get_study_container_text(self, element: Any, href: str) -> str:
+        """Get container text for a study element.
+
+        Args:
+            element: Selenium WebElement
+            href: Study URL
+
+        Returns:
+            Combined text from container and nearby elements
+        """
+        try:
+            parent_xpath = (
+                "./ancestor::*[contains(@class, 'study') or "
+                "contains(@class, 'card') or "
+                "contains(@class, 'item') or "
+                "contains(@class, 'row')][1]"
+            )
+            parent = element.find_element(By.XPATH, parent_xpath)
+            container_text = parent.text if parent else element.text
+
+            # Add nearby date text
+            href_xpath = self._sanitize_xpath_string(href)
+            container_text += self._collect_nearby_date_text(href_xpath)
+
+            return container_text
+
+        except Exception as e:  # noqa: S110
+            print(f"    ⚠️  Could not extract nearby date elements: {type(e).__name__}")
+            return element.text if element else ""
+
+    def parse_date_from_text(
+        self,
+        text: str,
+        date_patterns: Optional[list[str]] = None,
+        month_map: Optional[dict[str, str]] = None,
+    ) -> Optional[str]:
+        """Parse date from text using various patterns.
+
+        Args:
+            text: Text to search for date patterns
+            date_patterns: List of regex patterns (defaults to class constants)
+            month_map: Month name to number mapping (defaults to class constants)
+
+        Returns:
+            Date string in YYYYMMDD format, or None if not found
+        """
+        patterns = date_patterns or self.DATE_PATTERNS
+        months = month_map or self.MONTH_MAP
+
+        for pattern in patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             for match in matches:
-                try:
-                    if len(match) == 3:
-                        if pattern == date_patterns[0]:  # MM/DD/YYYY or DD/MM/YYYY
-                            # Handle both DD/MM/YYYY and MM/DD/YYYY formats
-                            part1, part2, year = match
-                            part1_int, part2_int, year_int = int(part1), int(part2), int(year)
+                result = self._try_parse_date_match(match, pattern, patterns, months)
+                if result:
+                    return result
+        return None
 
-                            # Try to determine format based on values
-                            if part1_int > 12:  # Must be DD/MM/YYYY (day > 12)
-                                day, month = part1_int, part2_int
-                            elif part2_int > 12:  # Must be MM/DD/YYYY (day > 12)
-                                month, day = part1_int, part2_int
-                            else:  # Ambiguous - assume DD/MM/YYYY (European format)
-                                day, month = part1_int, part2_int
+    def _try_parse_date_match(
+        self,
+        match: tuple[str, ...],
+        pattern: str,
+        patterns: list[str],
+        month_map: dict[str, str],
+    ) -> Optional[str]:
+        """Try to parse a single regex match into a date.
 
-                            # Validate the date
-                            if self._is_valid_date(year_int, month, day):
-                                return f"{year_int}{month:02d}{day:02d}"
+        Args:
+            match: Regex match tuple
+            pattern: The pattern that matched
+            patterns: Full list of patterns (for index comparison)
+            month_map: Month name to number mapping
 
-                        elif pattern == date_patterns[1]:  # YYYY/MM/DD
-                            year_str, month_str, day_str = match
-                            year_int, month_int, day_int = int(year_str), int(month_str), int(day_str)
-                            if self._is_valid_date(year_int, month_int, day_int):
-                                return f"{year_int}{month_int:02d}{day_int:02d}"
+        Returns:
+            Date string in YYYYMMDD format, or None if invalid
+        """
+        if len(match) != 3:
+            return None
 
-                        elif pattern == date_patterns[2]:  # DD Mon YYYY
-                            day_str, month_name, year_str = match
-                            day_int, year_int = int(day_str), int(year_str)
-                            month_int = int(month_map.get(month_name, "01"))
-                            if self._is_valid_date(year_int, month_int, day_int):
-                                return f"{year_int}{month_int:02d}{day_int:02d}"
+        try:
+            if pattern == patterns[0]:  # MM/DD/YYYY or DD/MM/YYYY
+                return self._parse_ambiguous_date(match)
+            elif pattern == patterns[1]:  # YYYY/MM/DD
+                return self._parse_iso_date(match)
+            elif pattern == patterns[2]:  # DD Mon YYYY
+                return self._parse_day_month_year_date(match, month_map)
+            elif pattern == patterns[3]:  # Mon DD, YYYY
+                return self._parse_month_day_year_date(match, month_map)
+        except (ValueError, KeyError):
+            pass
+        return None
 
-                        elif pattern == date_patterns[3]:  # Mon DD, YYYY
-                            month_name, day_str, year_str = match
-                            day_int, year_int = int(day_str), int(year_str)
-                            month_int = int(month_map.get(month_name, "01"))
-                            if self._is_valid_date(year_int, month_int, day_int):
-                                return f"{year_int}{month_int:02d}{day_int:02d}"
+    def _parse_ambiguous_date(self, match: tuple[str, ...]) -> Optional[str]:
+        """Parse ambiguous DD/MM vs MM/DD format."""
+        part1, part2, year = match
+        part1_int, part2_int, year_int = int(part1), int(part2), int(year)
 
-                except (ValueError, KeyError):
-                    continue
+        # Try to determine format based on values
+        if part1_int > 12:  # Must be DD/MM/YYYY (day > 12)
+            day, month = part1_int, part2_int
+        elif part2_int > 12:  # Must be MM/DD/YYYY (day > 12)
+            month, day = part1_int, part2_int
+        else:  # Ambiguous - assume DD/MM/YYYY (European format)
+            day, month = part1_int, part2_int
 
+        if self._is_valid_date(year_int, month, day):
+            return f"{year_int}{month:02d}{day:02d}"
+        return None
+
+    def _parse_iso_date(self, match: tuple[str, ...]) -> Optional[str]:
+        """Parse YYYY/MM/DD format."""
+        year_str, month_str, day_str = match
+        year_int, month_int, day_int = int(year_str), int(month_str), int(day_str)
+        if self._is_valid_date(year_int, month_int, day_int):
+            return f"{year_int}{month_int:02d}{day_int:02d}"
+        return None
+
+    def _parse_day_month_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> Optional[str]:
+        """Parse DD Mon YYYY format."""
+        day_str, month_name, year_str = match
+        day_int, year_int = int(day_str), int(year_str)
+        month_int = int(month_map.get(month_name, "01"))
+        if self._is_valid_date(year_int, month_int, day_int):
+            return f"{year_int}{month_int:02d}{day_int:02d}"
+        return None
+
+    def _parse_month_day_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> Optional[str]:
+        """Parse Mon DD, YYYY format."""
+        month_name, day_str, year_str = match
+        day_int, year_int = int(day_str), int(year_str)
+        month_int = int(month_map.get(month_name, "01"))
+        if self._is_valid_date(year_int, month_int, day_int):
+            return f"{year_int}{month_int:02d}{day_int:02d}"
         return None
 
     def extract_date_from_study_id(self, study_id: str) -> Optional[str]:
@@ -334,116 +437,165 @@ class WellbinMedicalDownloader:
         return None
 
     def extract_dates_for_studies(self, study_links: list[str]) -> None:
-        """Extract dates only for specific study links"""
+        """Extract dates only for specific study links."""
         try:
-            # Common date patterns to look for
-            date_patterns = [
-                r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",  # MM/DD/YYYY or DD/MM/YYYY
-                r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",  # YYYY/MM/DD
-                r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",  # DD Mon YYYY
-                r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",  # Mon DD, YYYY
-            ]
-
-            month_map = {
-                "Jan": "01",
-                "Feb": "02",
-                "Mar": "03",
-                "Apr": "04",
-                "May": "05",
-                "Jun": "06",
-                "Jul": "07",
-                "Aug": "08",
-                "Sep": "09",
-                "Oct": "10",
-                "Nov": "11",
-                "Dec": "12",
-            }
-
             assert self.driver is not None, "Driver should be initialized"  # nosec
-            # Find study elements that match our filtered links
+
             for href in study_links:
-                try:
-                    # Find the specific study element by href (using sanitized XPath)
-                    href_xpath = self._sanitize_xpath_string(href)
-                    study_elements = self.driver.find_elements(By.XPATH, f"//a[@href={href_xpath}]")
-
-                    for element in study_elements:
-                        try:
-                            # Get the parent container to look for dates nearby
-                            parent_xpath = (
-                                "./ancestor::*[contains(@class, 'study') or "
-                                "contains(@class, 'card') or "
-                                "contains(@class, 'item') or "
-                                "contains(@class, 'row')][1]"
-                            )
-                            parent = element.find_element(By.XPATH, parent_xpath)
-                            container_text = parent.text if parent else element.text
-
-                            # Look for dates in the bottom area of study cards
-                            try:
-                                # Look for date patterns in the entire parent container
-                                date_elements = parent.find_elements(By.XPATH, ".//*")
-                                for date_elem in date_elements:
-                                    elem_text = date_elem.text.strip()
-                                    has_date = "/" in elem_text or any(char.isdigit() for char in elem_text)
-                                    if elem_text and has_date:
-                                        container_text += " " + elem_text
-
-                                # Also check siblings and nearby elements (using sanitized XPath)
-                                nearby_xpath = (
-                                    f"//a[@href={href_xpath}]/ancestor::*[1]//*["
-                                    "contains(text(), '202') or "
-                                    "contains(text(), '201') or "
-                                    "contains(text(), '/')]"
-                                )
-                                nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
-                                for nearby in nearby_elements:
-                                    if nearby.text.strip():
-                                        container_text += " " + nearby.text
-                            except Exception as e:  # noqa: S110
-                                print(f"    ⚠️  Could not extract date patterns from parent: {type(e).__name__}")
-
-                            # Extract date from the container text
-                            study_date = self.parse_date_from_text(container_text, date_patterns, month_map)
-
-                            if study_date:
-                                self.study_dates[href] = study_date
-                                print(f"  📅 {href} -> {study_date} (found in text: '{container_text[:100]}...')")
-                                break  # Found date for this study, move to next
-                            else:
-                                # Fallback: extract from URL or use current date
-                                study_id_match = re.search(r"/study/([^?]+)", href)
-                                if study_id_match:
-                                    study_id = study_id_match.group(1)
-                                    # Try to extract date from study ID (some IDs contain timestamps)
-                                    fallback_date = self.extract_date_from_study_id(study_id)
-                                    if fallback_date:
-                                        self.study_dates[href] = fallback_date
-                                        print(f"  📅 {href} -> {fallback_date} (from ID)")
-                                        break
-                                    else:
-                                        # Use a default date pattern
-                                        self.study_dates[href] = "20240101"  # Default fallback
-                                        print(f"  ⚠️  {href} -> 20240101 (fallback)")
-                                        break
-
-                        except Exception as e:
-                            print(f"    ❌ Error processing element: {type(e).__name__}: {e}")
-                            continue
-
-                    # If no date found for this study, use fallback
-                    if href not in self.study_dates:
-                        self.study_dates[href] = "20240101"
-                        print(f"  ⚠️  {href} -> 20240101 (no date found)")
-
-                except Exception as e:
-                    print(f"  ❌ Error extracting date for {href}: {e}")
-                    self.study_dates[href] = "20240101"  # Fallback
+                date = self._extract_date_for_single_study(href)
+                self.study_dates[href] = date
+                self._log_date_extraction(href, date)
 
             print(f"📊 Extracted dates for {len(self.study_dates)} studies")
 
         except Exception as e:
             print(f"❌ Error extracting study dates: {e}")
+
+    def _extract_date_for_single_study(self, href: str) -> str:
+        """Extract date for a single study URL.
+
+        Args:
+            href: Study URL to extract date from
+
+        Returns:
+            Date string in YYYYMMDD format
+        """
+        try:
+            assert self.driver is not None, "Driver should be initialized"  # nosec
+            href_xpath = self._sanitize_xpath_string(href)
+            study_elements = self.driver.find_elements(By.XPATH, f"//a[@href={href_xpath}]")
+
+            for element in study_elements:
+                container_text = self._extract_container_text(element, href_xpath)
+                study_date = self.parse_date_from_text(container_text)
+
+                if study_date:
+                    return study_date
+
+            # Try fallback extraction
+            return self._get_fallback_date(href)
+
+        except Exception as e:
+            print(f"  ❌ Error extracting date for {href}: {e}")
+            return self.DEFAULT_DATE
+
+    def _extract_container_text(self, element: Any, href_xpath: str) -> str:
+        """Extract all relevant text from an element's container.
+
+        Args:
+            element: Selenium WebElement
+            href_xpath: Sanitized XPath for the href
+
+        Returns:
+            Combined text from container and nearby elements
+        """
+        try:
+            parent_xpath = (
+                "./ancestor::*[contains(@class, 'study') or "
+                "contains(@class, 'card') or "
+                "contains(@class, 'item') or "
+                "contains(@class, 'row')][1]"
+            )
+            parent = element.find_element(By.XPATH, parent_xpath)
+            container_text = parent.text if parent else element.text
+
+            # Add text from child elements that might contain dates
+            container_text += self._collect_date_like_text(parent)
+            container_text += self._collect_nearby_date_text(href_xpath)
+
+            return container_text
+
+        except Exception as e:
+            print(f"    ⚠️  Could not extract container text: {type(e).__name__}")
+            return element.text if element else ""
+
+    def _collect_date_like_text(self, parent: Any) -> str:
+        """Collect text from child elements that look like dates.
+
+        Args:
+            parent: Parent Selenium WebElement
+
+        Returns:
+            Combined text that might contain date information
+        """
+        additional_text = ""
+        try:
+            date_elements = parent.find_elements(By.XPATH, ".//*")
+            for date_elem in date_elements:
+                elem_text = date_elem.text.strip()
+                if elem_text and self._looks_like_date_text(elem_text):
+                    additional_text += " " + elem_text
+        except Exception as e:  # noqa: S110
+            print(f"    ⚠️  Could not extract date patterns from parent: {type(e).__name__}")
+        return additional_text
+
+    def _collect_nearby_date_text(self, href_xpath: str) -> str:
+        """Collect text from nearby elements that might contain dates.
+
+        Args:
+            href_xpath: Sanitized XPath for the href
+
+        Returns:
+            Combined text from nearby elements
+        """
+        additional_text = ""
+        try:
+            nearby_xpath = (
+                f"//a[@href={href_xpath}]/ancestor::*[1]//*["
+                "contains(text(), '202') or "
+                "contains(text(), '201') or "
+                "contains(text(), '/')]"
+            )
+            assert self.driver is not None, "Driver should be initialized"  # nosec
+            nearby_elements = self.driver.find_elements(By.XPATH, nearby_xpath)
+            for nearby in nearby_elements:
+                if nearby.text.strip():
+                    additional_text += " " + nearby.text
+        except Exception:  # noqa: S110
+            pass
+        return additional_text
+
+    @staticmethod
+    def _looks_like_date_text(text: str) -> bool:
+        """Check if text looks like it might contain a date.
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if text might contain date information
+        """
+        return "/" in text or any(char.isdigit() for char in text)
+
+    def _get_fallback_date(self, href: str) -> str:
+        """Get a fallback date from URL or use default.
+
+        Args:
+            href: Study URL to extract date from
+
+        Returns:
+            Date string in YYYYMMDD format
+        """
+        study_id_match = re.search(r"/study/([^?]+)", href)
+        if study_id_match:
+            study_id = study_id_match.group(1)
+            fallback_date = self.extract_date_from_study_id(study_id)
+            if fallback_date:
+                return fallback_date
+
+        return self.DEFAULT_DATE
+
+    def _log_date_extraction(self, href: str, date: str) -> None:
+        """Log the result of date extraction.
+
+        Args:
+            href: Study URL
+            date: Extracted date string
+        """
+        if date == self.DEFAULT_DATE:
+            print(f"  ⚠️  {href} -> {date} (fallback)")
+        else:
+            print(f"  📅 {href} -> {date}")
 
     def extract_date_from_study_page(self, study_url: str) -> str:
         """Extract date from the study page using the item-value report-date class"""
@@ -503,137 +655,241 @@ class WellbinMedicalDownloader:
             return "20240101"  # Default fallback
 
     def get_study_links(self) -> list[str]:
-        """Get study links from the explorer page, filtered by study type"""
+        """Get study links from the explorer page, filtered by study type."""
         try:
-            print("🔍 Navigating to Explorer to find studies...")
-            print(f"📍 Going to: {self.explorer_url}")
-            assert self.driver is not None, "Driver should be initialized"  # nosec
-            self.driver.get(self.explorer_url)
-            time.sleep(3)
+            self._navigate_to_explorer()
 
-            current_url = self.driver.current_url
-            print(f"📍 Explorer page URL: {current_url}")
+            study_links = self._collect_study_links()
 
-            # Look for study links
-            study_links: list[str] = []
-
-            # Find all links on the page
-            print("🔎 Searching for study links...")
-            all_links = self.driver.find_elements(By.TAG_NAME, "a")
-            print(f"📊 Found {len(all_links)} total links on page")
-
-            # Filter by study type FIRST
-            print(f"🎯 Filtering for study types: {', '.join(self.study_types)}")
-
-            for link in all_links:
-                try:
-                    href = link.get_attribute("href")
-                    if href and "study/" in href:
-                        # Check if this study type is in our filter
-                        study_type_found = False
-                        for study_type in self.study_types:
-                            if f"type={study_type}" in href:
-                                study_type_found = True
-                                study_links.append(href)
-                                # Extract study type from URL for logging
-                                print(f"  ✅ Found {study_type}: {href}")
-                                break
-
-                        # Handle "all" study types
-                        if not study_type_found and "all" in self.study_types:
-                            # Check if it's any of the known study types
-                            if any(f"type={st}" in href for st in ["FhirStudy", "DicomStudy"]):
-                                study_links.append(href)
-                                print(f"  ✅ Found (all types): {href}")
-
-                except Exception as e:
-                    print(f"  ❌ Error processing link: {e}")
-                    continue
-
-            print(f"📊 Found {len(study_links)} matching study links")
-
-            # Apply limit if specified
-            if self.limit_studies and len(study_links) > self.limit_studies:
-                print(f"🔢 Limiting to {self.limit_studies} studies (found {len(study_links)})")
-                study_links = study_links[: self.limit_studies]
-
-            # Note: Dates will be extracted when processing individual study pages
-            # since they're not available on the explorer page
-
-            return study_links
+            return self._apply_study_limit(study_links)
 
         except Exception as e:
             print(f"❌ Error getting study links: {e}")
             return []
 
-    def get_pdf_from_study(self, study_url: str, study_index: int = 1, total_studies: int = 1) -> list[dict[str, Any]]:
-        """Get PDF download links from a study page"""
+    def _navigate_to_explorer(self) -> None:
+        """Navigate to the explorer page."""
+        print("🔍 Navigating to Explorer to find studies...")
+        print(f"📍 Going to: {self.explorer_url}")
+        assert self.driver is not None, "Driver should be initialized"  # nosec
+        self.driver.get(self.explorer_url)
+        time.sleep(3)
+        print(f"📍 Explorer page URL: {self.driver.current_url}")
+
+    def _collect_study_links(self) -> list[str]:
+        """Collect and filter study links from the current page."""
+        print("🔎 Searching for study links...")
+        assert self.driver is not None, "Driver should be initialized"  # nosec
+        all_links = self.driver.find_elements(By.TAG_NAME, "a")
+        print(f"📊 Found {len(all_links)} total links on page")
+
+        print(f"🎯 Filtering for study types: {', '.join(self.study_types)}")
+
+        study_links: list[str] = []
+        for link in all_links:
+            href = self._extract_valid_study_link(link)
+            if href and self._matches_study_type(href, self.study_types):
+                study_links.append(href)
+                print(f"  ✅ Found: {href}")
+
+        print(f"📊 Found {len(study_links)} matching study links")
+        return study_links
+
+    def _extract_valid_study_link(self, link: Any) -> Optional[str]:
+        """Extract href from a link element if it's a valid study link."""
         try:
-            # Extract study type from URL
-            type_match = re.search(r"type=([^&]+)", study_url)
-            study_type = type_match.group(1) if type_match else "Unknown"
+            href = link.get_attribute("href")
+            if href and "study/" in href:
+                return href
+        except Exception as e:
+            print(f"  ❌ Error processing link: {e}")
+        return None
 
-            print(f"\n[{study_index}/{total_studies}] 📄 Processing {study_type} study:")
-            print(f"  🔗 URL: {study_url}")
+    def _apply_study_limit(self, study_links: list[str]) -> list[str]:
+        """Apply study limit if configured."""
+        if self.limit_studies and len(study_links) > self.limit_studies:
+            print(f"🔢 Limiting to {self.limit_studies} studies (found {len(study_links)})")
+            return study_links[: self.limit_studies]
+        return study_links
 
-            assert self.driver is not None, "Driver should be initialized"  # nosec
-            self.driver.get(study_url)
-            time.sleep(1)
+    def get_pdf_from_study(self, study_url: str, study_index: int = 1, total_studies: int = 1) -> list[dict[str, Any]]:
+        """Get PDF download links from a study page.
 
-            current_url = self.driver.current_url
-            print(f"  📍 Loaded URL: {current_url}")
+        Args:
+            study_url: URL of the study page
+            study_index: Current study index (for progress display)
+            total_studies: Total number of studies (for progress display)
 
-            # Extract the study date from the study page itself
-            study_date = self.extract_date_from_study_page(study_url)
-            print(f"  📅 Study date: {study_date}")
+        Returns:
+            List of PDF download info dictionaries
+        """
+        try:
+            study_type = self._extract_study_type(study_url)
+            self._print_study_progress(study_url, study_index, total_studies, study_type)
 
-            # Look for the "Descargar estudio" button that points to S3
-            print("  🔍 Looking for 'Descargar estudio' button...")
+            self._navigate_to_study(study_url)
+            study_date = self._extract_study_date(study_url)
 
-            try:
-                # Go directly to S3 URL selector since we know it works
-                elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'wellbin-uploads.s3')]")
-
-                download_element = None
-                if elements:
-                    # Take the first S3 link found
-                    download_element = elements[0]
-                    href = download_element.get_attribute("href")
-                    text = download_element.text.strip()
-                    print(f"  ✅ Found S3 download link: '{text}' -> {href and href[:100]}...")
-
-                if download_element:
-                    href = download_element.get_attribute("href")
-                    text = download_element.text.strip() or "Download"
-
-                    pdf_info: dict[str, Any] = {
-                        "url": href,
-                        "text": text,
-                        "study_url": study_url,
-                        "study_type": study_type,
-                        "study_date": study_date,
-                    }
-                    print(f"  ✅ Found download link: {href and href[:100]}...")
-                    return [pdf_info]
-                else:
-                    # Debug: show all links on the page
-                    print("  🔍 All links on page:")
-                    all_links = self.driver.find_elements(By.TAG_NAME, "a")[:10]  # First 10 links
-                    for i, link in enumerate(all_links, 1):
-                        href = link.get_attribute("href")
-                        text = link.text.strip()
-                        print(f"    {i}. '{text}' -> {href[:80] if href else 'No href'}...")
-
-                    print("  ❌ No S3 download link found")
-                    return []
-
-            except Exception as e:
-                print(f"  ❌ Error finding download link: {e}")
-                return []
+            return self._find_pdf_download_links(study_url, study_type, study_date)
 
         except Exception as e:
             print(f"  ❌ Error processing study {study_url}: {e}")
             return []
+
+    def _extract_study_type(self, study_url: str) -> str:
+        """Extract study type from URL.
+
+        Args:
+            study_url: Study page URL
+
+        Returns:
+            Study type string (e.g., "FhirStudy", "DicomStudy")
+        """
+        type_match = re.search(r"type=([^&]+)", study_url)
+        return type_match.group(1) if type_match else "Unknown"
+
+    def _print_study_progress(self, study_url: str, index: int, total: int, study_type: str) -> None:
+        """Print study processing progress.
+
+        Args:
+            study_url: Study page URL
+            index: Current study index
+            total: Total number of studies
+            study_type: Type of study
+        """
+        print(f"\n[{index}/{total}] 📄 Processing {study_type} study:")
+        print(f"  🔗 URL: {study_url}")
+
+    def _navigate_to_study(self, study_url: str) -> None:
+        """Navigate to study page.
+
+        Args:
+            study_url: URL to navigate to
+        """
+        assert self.driver is not None, "Driver should be initialized"  # nosec
+        self.driver.get(study_url)
+        time.sleep(1)
+        print(f"  📍 Loaded URL: {self.driver.current_url}")
+
+    def _extract_study_date(self, study_url: str) -> str:
+        """Extract and print study date.
+
+        Args:
+            study_url: Study page URL
+
+        Returns:
+            Study date string
+        """
+        study_date = self.extract_date_from_study_page(study_url)
+        print(f"  📅 Study date: {study_date}")
+        return study_date
+
+    def _find_pdf_download_links(self, study_url: str, study_type: str, study_date: str) -> list[dict[str, Any]]:
+        """Find PDF download links on study page.
+
+        Args:
+            study_url: Study page URL
+            study_type: Type of study
+            study_date: Study date string
+
+        Returns:
+            List of PDF download info dictionaries
+        """
+        print("  🔍 Looking for 'Descargar estudio' button...")
+
+        try:
+            elements = self._find_s3_download_elements()
+
+            if elements:
+                return self._process_download_element(elements[0], study_url, study_type, study_date)
+
+            self._print_available_links()
+            print("  ❌ No S3 download link found")
+            return []
+
+        except Exception as e:
+            print(f"  ❌ Error finding download link: {e}")
+            return []
+
+    def _find_s3_download_elements(self) -> list[Any]:
+        """Find S3 download link elements on page.
+
+        Returns:
+            List of Selenium WebElement objects
+        """
+        assert self.driver is not None, "Driver should be initialized"  # nosec
+        elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'wellbin-uploads.s3')]")
+
+        if elements:
+            href = elements[0].get_attribute("href")
+            text = elements[0].text.strip()
+            print(f"  ✅ Found S3 download link: '{text}' -> {href and href[:100]}...")
+
+        return elements
+
+    def _process_download_element(
+        self, element: Any, study_url: str, study_type: str, study_date: str
+    ) -> list[dict[str, Any]]:
+        """Process a download element and return PDF info.
+
+        Args:
+            element: Selenium WebElement for download link
+            study_url: Study page URL
+            study_type: Type of study
+            study_date: Study date string
+
+        Returns:
+            List containing single PDF info dictionary
+        """
+        href = element.get_attribute("href")
+        text = element.text.strip() or "Download"
+
+        print(f"  ✅ Found download link: {href and href[:100]}...")
+
+        return [
+            {
+                "url": href,
+                "text": text,
+                "study_url": study_url,
+                "study_type": study_type,
+                "study_date": study_date,
+            }
+        ]
+
+    def _print_available_links(self) -> None:
+        """Print available links on page for debugging."""
+        print("  🔍 All links on page:")
+        assert self.driver is not None, "Driver should be initialized"  # nosec
+        all_links = self.driver.find_elements(By.TAG_NAME, "a")[:10]
+
+        for i, link in enumerate(all_links, 1):
+            href = link.get_attribute("href")
+            text = link.text.strip()
+            print(f"    {i}. '{text}' -> {href[:80] if href else 'No href'}...")
+
+    def _extract_study_type_from_url(self, url: str) -> str:
+        """Extract study type from URL parameter.
+
+        Args:
+            url: Study URL containing type parameter
+
+        Returns:
+            Study type string or "Unknown"
+        """
+        type_match = re.search(r"type=([^&]+)", url)
+        return type_match.group(1) if type_match else "Unknown"
+
+    def _print_study_header(self, study_type: str, study_url: str, index: int, total: int) -> None:
+        """Print study processing header.
+
+        Args:
+            study_type: Type of study being processed
+            study_url: URL of the study
+            index: Current study index
+            total: Total number of studies
+        """
+        print(f"\n[{index}/{total}] 📄 Processing {study_type} study:")
+        print(f"  🔗 URL: {study_url}")
 
     def generate_filename(self, study_date: str, study_type: str) -> str:
         """Generate filename with deduplication using format YYYYMMDD-{type}-N.pdf"""
@@ -716,16 +972,13 @@ class WellbinMedicalDownloader:
             return None
 
     def scrape_studies(self) -> list[dict[str, Any]]:
-        """Main method to download studies and download PDFs"""
+        """Main method to download studies and download PDFs."""
         downloaded_files: list[dict[str, Any]] = []
 
         try:
-            # Login
-            if not self.login():
-                print("❌ Login failed, cannot proceed")
+            if not self._ensure_login():
                 return downloaded_files
 
-            # Get study links (this also extracts dates)
             study_links = self.get_study_links()
             if not study_links:
                 print("❌ No study links found matching the filter")
@@ -733,18 +986,7 @@ class WellbinMedicalDownloader:
 
             print(f"\n🎯 Processing {len(study_links)} studies...")
 
-            # Process each study
-            all_pdf_links: list[dict[str, Any]] = []
-            for i, study_url in enumerate(study_links, 1):
-                pdf_links = self.get_pdf_from_study(study_url, i, len(study_links))
-                for pdf in pdf_links:
-                    pdf["study_index"] = i
-                all_pdf_links.extend(pdf_links)
-
-                # Brief delay between studies
-                if i < len(study_links):
-                    time.sleep(0.5)
-
+            all_pdf_links = self._collect_all_pdf_links(study_links)
             if not all_pdf_links:
                 print("❌ No PDF links found in any studies")
                 return downloaded_files
@@ -752,26 +994,7 @@ class WellbinMedicalDownloader:
             print(f"\n📊 Found {len(all_pdf_links)} total PDF files to download")
             print("=" * 60)
 
-            # Download all PDFs
-            for i, pdf_info in enumerate(all_pdf_links, 1):
-                filepath = self.download_pdf(pdf_info, i, len(all_pdf_links))
-                if filepath:
-                    downloaded_files.append(
-                        {
-                            "local_path": filepath,
-                            "original_url": pdf_info["url"],
-                            "study_url": pdf_info["study_url"],
-                            "study_type": pdf_info["study_type"],
-                            "study_date": pdf_info["study_date"],
-                            "description": pdf_info["text"],
-                            "study_index": pdf_info["study_index"],
-                        }
-                    )
-
-                # Brief delay between downloads
-                if i < len(all_pdf_links):
-                    time.sleep(0.2)
-
+            downloaded_files = self._download_all_pdfs(all_pdf_links)
             return downloaded_files
 
         except Exception as e:
@@ -781,17 +1004,84 @@ class WellbinMedicalDownloader:
             print(f"🔍 Traceback: {traceback.format_exc()}")
             return downloaded_files
         finally:
-            # Clean up resources
-            try:
-                if self.driver:
-                    print("🔒 Closing browser...")
-                    self.driver.quit()
-            except Exception as e:
-                print(f"⚠️  Error closing browser: {type(e).__name__}: {e}")
+            self._cleanup_resources()
 
-            # Ensure session is closed
-            try:
-                if self.session:
-                    self.session.close()
-            except Exception as e:
-                print(f"⚠️  Error closing session: {type(e).__name__}: {e}")
+    def _ensure_login(self) -> bool:
+        """Ensure successful login.
+
+        Returns:
+            True if login successful, False otherwise
+        """
+        if not self.login():
+            print("❌ Login failed, cannot proceed")
+            return False
+        return True
+
+    def _collect_all_pdf_links(self, study_links: list[str]) -> list[PDFDownloadInfo]:
+        """Collect PDF download links from all studies.
+
+        Args:
+            study_links: List of study URLs to process
+
+        Returns:
+            List of PDFDownloadInfo objects
+        """
+        all_pdf_links: list[PDFDownloadInfo] = []
+        total_studies = len(study_links)
+
+        for i, study_url in enumerate(study_links, 1):
+            pdf_links = self.get_pdf_from_study(study_url, i, total_studies)
+            for pdf in pdf_links:
+                pdf["study_index"] = i
+                all_pdf_links.append(PDFDownloadInfo(**pdf))
+
+            if i < total_studies:
+                time.sleep(0.5)
+
+        return all_pdf_links
+
+    def _download_all_pdfs(self, pdf_links: list[PDFDownloadInfo]) -> list[dict[str, Any]]:
+        """Download all PDFs and return results.
+
+        Args:
+            pdf_links: List of PDF download information
+
+        Returns:
+            List of download result dictionaries
+        """
+        downloaded_files: list[dict[str, Any]] = []
+        total_pdfs = len(pdf_links)
+
+        for i, pdf_info in enumerate(pdf_links, 1):
+            filepath = self.download_pdf(pdf_info.__dict__, i, total_pdfs)
+            if filepath:
+                result = DownloadResult(
+                    local_path=filepath,
+                    original_url=pdf_info.url,
+                    study_url=pdf_info.study_url,
+                    study_type=pdf_info.study_type,
+                    study_date=pdf_info.study_date,
+                    description=pdf_info.text,
+                    study_index=pdf_info.study_index,
+                )
+                downloaded_files.append(result.__dict__)
+
+            if i < total_pdfs:
+                time.sleep(0.2)
+
+        return downloaded_files
+
+    def _cleanup_resources(self) -> None:
+        """Clean up browser and session resources."""
+        try:
+            if self.driver:
+                print("🔒 Closing browser...")
+                self.driver.quit()
+        except Exception as e:
+            print(f"⚠️  Error closing browser: {type(e).__name__}: {e}")
+
+        try:
+            if self.session:
+                self.session.close()
+        except Exception as e:
+            print(f"⚠️  Error closing session: {type(e).__name__}: {e}")
