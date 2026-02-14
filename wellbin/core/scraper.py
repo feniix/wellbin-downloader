@@ -14,12 +14,31 @@ from dataclasses import dataclass
 
 import requests
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
+from .date_parser import (
+    extract_date_from_study_id,
+    get_fallback_date,
+    parse_date_from_text,
+)
+from .exceptions import (
+    ConnectionTimeoutError,
+    DownloadError,
+    MaxRetriesExceededError,
+    S3DownloadError,
+    S3UrlExpiredError,
+)
 from .logging import Output, get_output
 
 
@@ -90,30 +109,7 @@ class WellbinMedicalDownloader:
             },
         }
 
-    # Class constants for date handling
-    DATE_PATTERNS: list[str] = [
-        r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",  # MM/DD/YYYY or DD/MM/YYYY
-        r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",  # YYYY/MM/DD
-        r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",  # DD Mon YYYY
-        r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",  # Mon DD, YYYY
-    ]
-
-    MONTH_MAP: dict[str, str] = {
-        "Jan": "01",
-        "Feb": "02",
-        "Mar": "03",
-        "Apr": "04",
-        "May": "05",
-        "Jun": "06",
-        "Jul": "07",
-        "Aug": "08",
-        "Sep": "09",
-        "Oct": "10",
-        "Nov": "11",
-        "Dec": "12",
-    }
-
-    DEFAULT_DATE: str = "20240101"
+    # Class-specific constants (date handling uses module-level from date_parser)
     KNOWN_STUDY_TYPES: tuple[str, ...] = ("FhirStudy", "DicomStudy")
     USER_AGENT: str = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -126,23 +122,6 @@ class WellbinMedicalDownloader:
         "contains(@class, 'item') or "
         "contains(@class, 'row')][1]"
     )
-
-    @staticmethod
-    def _is_valid_date(year: int, month: int, day: int) -> bool:
-        """Validate that date components form a valid calendar date."""
-        if not (1900 <= year <= 2099):
-            return False
-        if not (1 <= month <= 12):
-            return False
-
-        days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        # Handle leap years
-        if month == 2 and ((year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)):
-            max_day = 29
-        else:
-            max_day = days_in_month[month - 1]
-
-        return 1 <= day <= max_day
 
     @staticmethod
     def _sanitize_xpath_string(s: str) -> str:
@@ -189,7 +168,7 @@ class WellbinMedicalDownloader:
         self.out.success("Chrome driver ready")
 
     def login(self) -> bool:
-        """Login to Wellbin"""
+        """Login to Wellbin with explicit waits for reliability."""
         try:
             self.out.log("\U0001f510", "Logging into Wellbin...")
             self.setup_driver()
@@ -198,11 +177,13 @@ class WellbinMedicalDownloader:
             self.out.log("\U0001f4cd", f"Navigating to: {self.login_url}")
             assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.login_url)
-            time.sleep(2)
+
+            # Wait for login form to be present
+            wait = WebDriverWait(self.driver, 10)
+            email_field = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
 
             # Fill login form
             self.out.log("\U0001f4dd", "Filling login credentials...")
-            email_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='email']")
             password_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='password']")
 
             email_field.clear()
@@ -215,16 +196,15 @@ class WellbinMedicalDownloader:
             submit_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
             submit_button.click()
 
-            time.sleep(3)
-
-            # Verify login success
-            current_url = self.driver.current_url
-            self.out.log("\U0001f4cd", f"After login, current URL: {current_url}")
-
-            if "dashboard" in current_url.lower():
+            # Wait for redirect to dashboard (login success indicator)
+            try:
+                wait.until(EC.url_contains("dashboard"))
+                current_url = self.driver.current_url
+                self.out.log("\U0001f4cd", f"After login, current URL: {current_url}")
                 self.out.success("Login successful!")
                 return True
-            else:
+            except TimeoutException:
+                current_url = self.driver.current_url
                 self.out.error(f"Login failed. Expected dashboard URL, got: {current_url}")
                 return False
 
@@ -232,18 +212,24 @@ class WellbinMedicalDownloader:
             self.out.error(f"Login form element not found: {e}")
             self.out.log("", "  Check if login page structure has changed")
             return False
+        except TimeoutException as e:
+            self.out.error(f"Timeout waiting for login page to load: {e}")
+            return False
         except Exception as e:
             self.out.error(f"Unexpected error during login: {type(e).__name__}: {e}")
             self.out.traceback()
             return False
 
     def extract_study_dates_from_explorer(self) -> bool:
-        """Extract study dates from the explorer page."""
+        """Extract study dates from the explorer page with explicit waits."""
         try:
             self.out.log("\U0001f4c5", "Extracting study dates from explorer page...")
             assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.explorer_url)
-            time.sleep(3)
+
+            # Wait for study links to be present
+            wait = WebDriverWait(self.driver, 15)
+            wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(@href, '/study/')]")))
 
             study_elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, '/study/')]")
             self.out.debug(f"Found {len(study_elements)} study elements, extracting dates...")
@@ -254,6 +240,9 @@ class WellbinMedicalDownloader:
             self.out.progress(f"Extracted dates for {len(self.study_dates)} studies")
             return True
 
+        except TimeoutException as e:
+            self.out.error(f"Timeout waiting for explorer page to load: {e}")
+            return False
         except Exception as e:
             self.out.error(f"Error extracting study dates: {type(e).__name__}: {e}")
             self.out.log("\U0001f50d", f"Traceback: {traceback.format_exc()}")
@@ -273,7 +262,7 @@ class WellbinMedicalDownloader:
             container_text = self._get_study_container_text(element, href)
 
             # Try to parse date from container text
-            study_date = self.parse_date_from_text(container_text)
+            study_date = self.parse_date_from_text_wrapper(container_text)
 
             if not study_date:
                 # Fallback to ID extraction or default
@@ -309,132 +298,30 @@ class WellbinMedicalDownloader:
             self.out.warning(f"  Could not extract nearby date elements: {type(e).__name__}")
             return element.text if element else ""
 
-    def parse_date_from_text(
+    def parse_date_from_text_wrapper(
         self,
         text: str,
         date_patterns: list[str] | None = None,
         month_map: dict[str, str] | None = None,
     ) -> str | None:
-        """Parse date from text using various patterns.
+        """Parse date from text using various patterns (wrapper for module function).
 
         Args:
             text: Text to search for date patterns
-            date_patterns: List of regex patterns (defaults to class constants)
-            month_map: Month name to number mapping (defaults to class constants)
+            date_patterns: List of regex patterns (defaults to module constants)
+            month_map: Month name to number mapping (defaults to module constants)
 
         Returns:
             Date string in YYYYMMDD format, or None if not found
         """
-        patterns = date_patterns or self.DATE_PATTERNS
-        months = month_map or self.MONTH_MAP
+        # Convert lists to tuples for caching
+        patterns_tuple = tuple(date_patterns) if date_patterns else None
+        months_tuple = tuple(month_map.items()) if month_map else None
+        return parse_date_from_text(text, patterns_tuple, months_tuple)
 
-        for pattern in patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for match in matches:
-                result = self._try_parse_date_match(match, pattern, patterns, months)
-                if result:
-                    return result
-        return None
-
-    def _try_parse_date_match(
-        self,
-        match: tuple[str, ...],
-        pattern: str,
-        patterns: list[str],
-        month_map: dict[str, str],
-    ) -> str | None:
-        """Try to parse a single regex match into a date.
-
-        Args:
-            match: Regex match tuple
-            pattern: The pattern that matched
-            patterns: Full list of patterns (for index comparison)
-            month_map: Month name to number mapping
-
-        Returns:
-            Date string in YYYYMMDD format, or None if invalid
-        """
-        if len(match) != 3:
-            return None
-
-        try:
-            if pattern == patterns[0]:  # MM/DD/YYYY or DD/MM/YYYY
-                return self._parse_ambiguous_date(match)
-            elif pattern == patterns[1]:  # YYYY/MM/DD
-                return self._parse_iso_date(match)
-            elif pattern == patterns[2]:  # DD Mon YYYY
-                return self._parse_day_month_year_date(match, month_map)
-            elif pattern == patterns[3]:  # Mon DD, YYYY
-                return self._parse_month_day_year_date(match, month_map)
-        except (ValueError, KeyError):
-            pass
-        return None
-
-    def _parse_ambiguous_date(self, match: tuple[str, ...]) -> str | None:
-        """Parse ambiguous DD/MM vs MM/DD format."""
-        part1, part2, year = match
-        part1_int, part2_int, year_int = int(part1), int(part2), int(year)
-
-        # Try to determine format based on values
-        if part1_int > 12:  # Must be DD/MM/YYYY (day > 12)
-            day, month = part1_int, part2_int
-        elif part2_int > 12:  # Must be MM/DD/YYYY (day > 12)
-            month, day = part1_int, part2_int
-        else:  # Ambiguous - assume DD/MM/YYYY (European format)
-            day, month = part1_int, part2_int
-
-        if self._is_valid_date(year_int, month, day):
-            return f"{year_int}{month:02d}{day:02d}"
-        return None
-
-    def _parse_iso_date(self, match: tuple[str, ...]) -> str | None:
-        """Parse YYYY/MM/DD format."""
-        year_str, month_str, day_str = match
-        year_int, month_int, day_int = int(year_str), int(month_str), int(day_str)
-        if self._is_valid_date(year_int, month_int, day_int):
-            return f"{year_int}{month_int:02d}{day_int:02d}"
-        return None
-
-    def _parse_day_month_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> str | None:
-        """Parse DD Mon YYYY format."""
-        day_str, month_name, year_str = match
-        day_int, year_int = int(day_str), int(year_str)
-        month_int = int(month_map.get(month_name, "01"))
-        if self._is_valid_date(year_int, month_int, day_int):
-            return f"{year_int}{month_int:02d}{day_int:02d}"
-        return None
-
-    def _parse_month_day_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> str | None:
-        """Parse Mon DD, YYYY format."""
-        month_name, day_str, year_str = match
-        day_int, year_int = int(day_str), int(year_str)
-        month_int = int(month_map.get(month_name, "01"))
-        if self._is_valid_date(year_int, month_int, day_int):
-            return f"{year_int}{month_int:02d}{day_int:02d}"
-        return None
-
-    def extract_date_from_study_id(self, study_id: str) -> str | None:
-        """Extract date from study ID if it contains timestamp patterns"""
-        # Look for timestamp patterns in study ID
-        timestamp_patterns = [
-            r"(\d{4})(\d{2})(\d{2})",  # YYYYMMDD
-            r"(\d{4})-(\d{2})-(\d{2})",  # YYYY-MM-DD
-            r"(\d{4})_(\d{2})_(\d{2})",  # YYYY_MM_DD
-        ]
-
-        for pattern in timestamp_patterns:
-            match = re.search(pattern, study_id)
-            if match:
-                year, month, day = match.groups()
-                try:
-                    year_int, month_int, day_int = int(year), int(month), int(day)
-                    # Validate date components using proper calendar validation
-                    if self._is_valid_date(year_int, month_int, day_int):
-                        return f"{year_int}{month_int:02d}{day_int:02d}"
-                except ValueError:
-                    continue
-
-        return None
+    def extract_date_from_study_id_wrapper(self, study_id: str) -> str | None:
+        """Extract date from study ID if it contains timestamp patterns (wrapper)."""
+        return extract_date_from_study_id(study_id)
 
     def extract_dates_for_studies(self, study_links: list[str]) -> None:
         """Extract dates only for specific study links."""
@@ -467,7 +354,7 @@ class WellbinMedicalDownloader:
 
             for element in study_elements:
                 container_text = self._extract_container_text(element, href_xpath)
-                study_date = self.parse_date_from_text(container_text)
+                study_date = self.parse_date_from_text_wrapper(container_text)
 
                 if study_date:
                     return study_date
@@ -477,7 +364,7 @@ class WellbinMedicalDownloader:
 
         except Exception as e:
             self.out.error(f"  Error extracting date for {href}: {e}")
-            return self.DEFAULT_DATE
+            return get_fallback_date()
 
     def _extract_container_text(self, element: WebElement, href_xpath: str) -> str:
         """Extract all relevant text from an element's container.
@@ -573,11 +460,11 @@ class WellbinMedicalDownloader:
         study_id_match = re.search(r"/study/([^?]+)", href)
         if study_id_match:
             study_id = study_id_match.group(1)
-            fallback_date = self.extract_date_from_study_id(study_id)
+            fallback_date = self.extract_date_from_study_id_wrapper(study_id)
             if fallback_date:
                 return fallback_date
 
-        return self.DEFAULT_DATE
+        return get_fallback_date()
 
     def _log_date_extraction(self, href: str, date: str) -> None:
         """Log the result of date extraction.
@@ -586,7 +473,7 @@ class WellbinMedicalDownloader:
             href: Study URL
             date: Extracted date string
         """
-        if date == self.DEFAULT_DATE:
+        if date == get_fallback_date():
             self.out.warning(f"  {href} -> {date} (fallback)")
         else:
             self.out.log("\U0001f4c5", f"  {href} -> {date}")
@@ -600,25 +487,25 @@ class WellbinMedicalDownloader:
 
             if date_text:
                 self.out.debug(f"    Found date text: '{date_text}'")
-                parsed_date = self.parse_date_from_text(date_text)
+                parsed_date = self.parse_date_from_text_wrapper(date_text)
                 if parsed_date:
                     return parsed_date
 
             # Fallback to study ID extraction if date parsing fails
             fallback_date = self._get_fallback_date(study_url)
-            if fallback_date != self.DEFAULT_DATE:
+            if fallback_date != get_fallback_date():
                 self.out.warning(f"    Using fallback date from ID: {fallback_date}")
                 return fallback_date
 
             self.out.warning("    No date found, using default")
-            return self.DEFAULT_DATE
+            return get_fallback_date()
 
         except NoSuchElementException:
             self.out.error("    Could not find div.item-value.report-date element")
-            return self.DEFAULT_DATE
+            return get_fallback_date()
         except Exception as e:
             self.out.error(f"    Error extracting date from study page: {e}")
-            return self.DEFAULT_DATE  # Default fallback
+            return get_fallback_date()  # Default fallback
 
     def get_study_links(self) -> list[str]:
         """Get study links from the explorer page, filtered by study type."""
@@ -634,12 +521,15 @@ class WellbinMedicalDownloader:
             return []
 
     def _navigate_to_explorer(self) -> None:
-        """Navigate to the explorer page."""
+        """Navigate to the explorer page with explicit wait for study elements."""
         self.out.debug("Navigating to Explorer to find studies...")
         self.out.log("\U0001f4cd", f"Going to: {self.explorer_url}")
         assert self.driver is not None, "Driver should be initialized"  # nosec
         self.driver.get(self.explorer_url)
-        time.sleep(3)
+
+        # Wait for study links to be present on the page
+        wait = WebDriverWait(self.driver, 15)
+        wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(@href, '/study/')]")))
         self.out.log("\U0001f4cd", f"Explorer page URL: {self.driver.current_url}")
 
     def _collect_study_links(self) -> list[str]:
@@ -728,14 +618,17 @@ class WellbinMedicalDownloader:
         self.out.log("\U0001f517", f"  URL: {study_url}")
 
     def _navigate_to_study(self, study_url: str) -> None:
-        """Navigate to study page.
+        """Navigate to study page with explicit wait.
 
         Args:
             study_url: URL to navigate to
         """
         assert self.driver is not None, "Driver should be initialized"  # nosec
         self.driver.get(study_url)
-        time.sleep(1)
+
+        # Wait for page content to load
+        wait = WebDriverWait(self.driver, 10)
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         self.out.log("\U0001f4cd", f"  Loaded URL: {self.driver.current_url}")
 
     def _extract_study_date(self, study_url: str) -> str:
@@ -837,7 +730,7 @@ class WellbinMedicalDownloader:
     def generate_filename(self, study_date: str, study_type: str) -> str:
         """Generate filename with deduplication using format YYYYMMDD-{type}-N.pdf"""
         if study_date == "unknown":
-            study_date = self.DEFAULT_DATE
+            study_date = get_fallback_date()
 
         # Get study type configuration
         config = self.study_config.get(study_type, {"name": "unknown"})
@@ -853,32 +746,50 @@ class WellbinMedicalDownloader:
 
         return filename
 
+    @retry(
+        retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
+    def _download_with_retry(self, url: str, headers: dict[str, str]) -> requests.Response:
+        """Internal method with retry logic for network requests."""
+        response = self.session.get(url, headers=headers, stream=True, timeout=30)
+        response.raise_for_status()
+        return response
+
     def download_pdf(
         self,
         pdf_info: PDFDownloadInfo,
         download_index: int = 1,
         total_downloads: int = 1,
     ) -> str | None:
-        """Download a PDF file"""
+        """Download a PDF file with retry logic and proper error handling."""
         try:
             self.out.blank()
             desc = f"Downloading {pdf_info.study_type} PDF ({pdf_info.study_date}):"
             self.out.step(download_index, total_downloads, "\U0001f4e5", desc)
             self.out.log("\U0001f4dd", f"  Description: {pdf_info.text}")
-            self.out.log("\U0001f517", f"  URL: {pdf_info.url[:100]}...")
+            # Redact sensitive query params from URL in logs
+            safe_url = pdf_info.url.split("?")[0] + "..." if "?" in pdf_info.url else pdf_info.url[:100]
+            self.out.log("\U0001f517", f"  URL: {safe_url}")
 
             # S3 URLs are pre-signed, no authentication needed
             headers = {"User-Agent": self.USER_AGENT}
 
             self.out.log("\U0001f310", "  Making download request...")
-            response = self.session.get(pdf_info.url, headers=headers, stream=True)
-            self.out.progress(f"  Response status: {response.status_code}")
-
-            if response.status_code != 200:
-                self.out.error(f"  Bad response status: {response.status_code}")
-                return None
-
-            response.raise_for_status()
+            try:
+                response = self._download_with_retry(pdf_info.url, headers)
+                self.out.progress(f"  Response status: {response.status_code}")
+            except requests.Timeout as e:
+                raise ConnectionTimeoutError("Download request timed out", f"URL: {safe_url}, Error: {e}") from e
+            except requests.ConnectionError as e:
+                raise S3DownloadError("Connection failed during download", f"URL: {safe_url}, Error: {e}") from e
+            except requests.HTTPError as e:
+                status_code = e.response.status_code if e.response else 0
+                if status_code == 403:
+                    raise S3UrlExpiredError("S3 pre-signed URL has expired", "Please retry the scraping process") from e
+                raise DownloadError(f"HTTP error during download: {status_code}", str(e)) from e
 
             # Generate filename based on study date and type
             filename = self.generate_filename(pdf_info.study_date, pdf_info.study_type)
@@ -903,6 +814,15 @@ class WellbinMedicalDownloader:
             self.out.log("\U0001f4cf", f"  File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
             return filepath
 
+        except MaxRetriesExceededError as e:
+            self.out.error(f"  Max retries exceeded: {e}")
+            self.out.log("\U0001f504", "  Tip: Check your network connection and try again")
+            return None
+        except (S3UrlExpiredError, ConnectionTimeoutError, S3DownloadError, DownloadError) as e:
+            self.out.error(f"  Download failed: {e.message}")
+            if e.details:
+                self.out.log("\U0001f50d", f"  Details: {e.details}")
+            return None
         except Exception as e:
             self.out.error(f"  Failed to download PDF: {e}")
             self.out.log("\U0001f50d", f"  Traceback: {traceback.format_exc()}")
@@ -972,6 +892,7 @@ class WellbinMedicalDownloader:
                 pdf.study_index = i
                 all_pdf_links.append(pdf)
 
+            # Intentional rate limiting delay to be respectful to Wellbin platform
             if i < total_studies:
                 time.sleep(0.5)
 
@@ -1003,6 +924,7 @@ class WellbinMedicalDownloader:
                 )
                 downloaded_files.append(result)
 
+            # Intentional rate limiting delay between downloads
             if i < total_pdfs:
                 time.sleep(0.2)
 

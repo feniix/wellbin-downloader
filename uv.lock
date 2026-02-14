@@ -1463,6 +1463,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "selenium" },
+    { name = "tenacity" },
     { name = "types-requests" },
 ]
 
@@ -1488,6 +1489,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "selenium", specifier = ">=4.15.0" },
+    { name = "tenacity", specifier = ">=8.2.0" },
     { name = "types-requests", specifier = ">=2.32.0.20250602" },
 ]
 

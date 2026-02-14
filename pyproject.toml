@@ -13,6 +13,7 @@ dependencies = [
     "pymupdf4llm>=0.0.5",
     "click>=8.0.0",
     "types-requests>=2.32.0.20250602",
+    "tenacity>=8.2.0",
 ]
 readme = "README.md"
 license = {text = "MIT"}

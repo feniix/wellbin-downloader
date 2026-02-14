@@ -9,6 +9,11 @@ import pytest
 import requests
 from selenium.common.exceptions import NoSuchElementException
 
+from wellbin.core.date_parser import (
+    extract_date_from_study_id,
+    is_valid_date,
+    parse_date_from_text,
+)
 from wellbin.core.scraper import PDFDownloadInfo, WellbinMedicalDownloader
 
 
@@ -90,60 +95,39 @@ class TestWellbinMedicalDownloader:
         assert not any("--headless" in str(arg) for arg in options_call.arguments)
 
     def test_parse_date_from_text(self, downloader):
-        """Test date parsing from various text formats."""
-        date_patterns = [
-            r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",
-            r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",
-            r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
-            r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",
-        ]
-        month_map = {
-            "Jan": "01",
-            "Feb": "02",
-            "Mar": "03",
-            "Apr": "04",
-            "May": "05",
-            "Jun": "06",
-            "Jul": "07",
-            "Aug": "08",
-            "Sep": "09",
-            "Oct": "10",
-            "Nov": "11",
-            "Dec": "12",
-        }
-
-        # Test DD/MM/YYYY format
-        result = downloader.parse_date_from_text("Date: 04/06/2024", date_patterns, month_map)
+        """Test date parsing from various text formats using module-level function."""
+        # Test DD/MM/YYYY format (uses default patterns)
+        result = parse_date_from_text("Date: 04/06/2024")
         assert result == "20240604"
 
-        # Test YYYY-MM-DD format
-        result = downloader.parse_date_from_text("Date: 2024-06-04", date_patterns, month_map)
+        # Test YYYY/MM/DD format
+        result = parse_date_from_text("Date: 2024/06/04")
         assert result == "20240604"
 
         # Test Month DD, YYYY format
-        result = downloader.parse_date_from_text("Date: Jun 04, 2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: Jun 04, 2024")
         assert result == "20240604"
 
         # Test no date found
-        result = downloader.parse_date_from_text("No date here", date_patterns, month_map)
+        result = parse_date_from_text("No date here")
         assert result is None
 
     def test_extract_date_from_study_id(self, downloader):
-        """Test extracting date from study ID."""
+        """Test extracting date from study ID using module-level function."""
         # Test YYYYMMDD format
-        result = downloader.extract_date_from_study_id("study_20240604_abc123")
+        result = extract_date_from_study_id("study_20240604_abc123")
         assert result == "20240604"
 
         # Test YYYY-MM-DD format
-        result = downloader.extract_date_from_study_id("study_2024-06-04_abc123")
+        result = extract_date_from_study_id("study_2024-06-04_abc123")
         assert result == "20240604"
 
         # Test no date pattern
-        result = downloader.extract_date_from_study_id("study_abc123")
+        result = extract_date_from_study_id("study_abc123")
         assert result is None
 
         # Test invalid date
-        result = downloader.extract_date_from_study_id("study_20241301_abc123")  # Invalid month
+        result = extract_date_from_study_id("study_20241301_abc123")  # Invalid month
         assert result is None
 
     def test_generate_filename(self, downloader):
@@ -293,22 +277,22 @@ class TestWellbinMedicalDownloader:
     def test_is_valid_date(self, downloader):
         """Test date validation helper."""
         # Valid dates
-        assert downloader._is_valid_date(2024, 6, 4) is True
-        assert downloader._is_valid_date(2024, 2, 29) is True  # Leap year
-        assert downloader._is_valid_date(2000, 2, 29) is True  # Leap year
-        assert downloader._is_valid_date(2023, 12, 31) is True
+        assert is_valid_date(2024, 6, 4) is True
+        assert is_valid_date(2024, 2, 29) is True  # Leap year
+        assert is_valid_date(2000, 2, 29) is True  # Leap year
+        assert is_valid_date(2023, 12, 31) is True
 
         # Invalid dates
-        assert downloader._is_valid_date(2023, 2, 29) is False  # Not a leap year
-        assert downloader._is_valid_date(2024, 2, 30) is False  # February has 29 days max
-        assert downloader._is_valid_date(2024, 4, 31) is False  # April has 30 days
-        assert downloader._is_valid_date(2024, 13, 1) is False  # Invalid month
-        assert downloader._is_valid_date(2024, 0, 1) is False  # Invalid month
-        assert downloader._is_valid_date(2024, 1, 0) is False  # Invalid day
-        assert downloader._is_valid_date(2024, 1, 32) is False  # Invalid day
-        assert downloader._is_valid_date(1899, 6, 4) is False  # Year too old
-        assert downloader._is_valid_date(2099, 6, 4) is True  # Year within range
-        assert downloader._is_valid_date(2100, 6, 4) is False  # Year too new (limit is 2099)
+        assert is_valid_date(2023, 2, 29) is False  # Not a leap year
+        assert is_valid_date(2024, 2, 30) is False  # February has 29 days max
+        assert is_valid_date(2024, 4, 31) is False  # April has 30 days
+        assert is_valid_date(2024, 13, 1) is False  # Invalid month
+        assert is_valid_date(2024, 0, 1) is False  # Invalid month
+        assert is_valid_date(2024, 1, 0) is False  # Invalid day
+        assert is_valid_date(2024, 1, 32) is False  # Invalid day
+        assert is_valid_date(1899, 6, 4) is False  # Year too old
+        assert is_valid_date(2099, 6, 4) is True  # Year within range
+        assert is_valid_date(2100, 6, 4) is False  # Year too new (limit is 2099)
 
     def test_sanitize_xpath_string(self, downloader):
         """Test XPath string sanitization."""
@@ -334,86 +318,62 @@ class TestWellbinMedicalDownloader:
 
     def test_parse_date_invalid_dates_rejected(self, downloader):
         """Test that invalid dates are rejected even if pattern matches."""
-        date_patterns = [
-            r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",
-            r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",
-            r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
-            r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",
-        ]
-        month_map = {
-            "Jan": "01",
-            "Feb": "02",
-            "Mar": "03",
-            "Apr": "04",
-            "May": "05",
-            "Jun": "06",
-            "Jul": "07",
-            "Aug": "08",
-            "Sep": "09",
-            "Oct": "10",
-            "Nov": "11",
-            "Dec": "12",
-        }
-
         # Feb 30 should be rejected
-        result = downloader.parse_date_from_text("Date: 30/02/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 30/02/2024")
         assert result is None
 
         # April 31 should be rejected
-        result = downloader.parse_date_from_text("Date: 31/04/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 31/04/2024")
         assert result is None
 
         # Test with month 13 - second part > 12, so it will be parsed as MM/DD
         # 05/13/2024 -> 05 (month) / 13 (day) - valid, should return 20240513
-        result = downloader.parse_date_from_text("Date: 05/13/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 05/13/2024")
         assert result == "20240513"  # 05 (month) / 13 (day) is valid
 
         # Valid Feb 29 in leap year should be accepted
-        result = downloader.parse_date_from_text("Date: 29/02/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 29/02/2024")
         assert result == "20240229"
 
         # Invalid Feb 29 in non-leap year should be rejected
-        result = downloader.parse_date_from_text("Date: 29/02/2023", date_patterns, month_map)
+        result = parse_date_from_text("Date: 29/02/2023")
         assert result is None
 
     def test_extract_date_from_study_id_with_validation(self, downloader):
         """Test date extraction from study ID with proper validation."""
         # Valid date
-        result = downloader.extract_date_from_study_id("study_20240604_abc123")
+        result = extract_date_from_study_id("study_20240604_abc123")
         assert result == "20240604"
 
         # Invalid date (Feb 30)
-        result = downloader.extract_date_from_study_id("study_20240230_abc123")
+        result = extract_date_from_study_id("study_20240230_abc123")
         assert result is None
 
         # Invalid date (month 13)
-        result = downloader.extract_date_from_study_id("study_20241304_abc123")
+        result = extract_date_from_study_id("study_20241304_abc123")
         assert result is None
 
         # Valid leap year date
-        result = downloader.extract_date_from_study_id("study_20240229_abc123")
+        result = extract_date_from_study_id("study_20240229_abc123")
         assert result == "20240229"
 
         # Invalid non-leap year Feb 29
-        result = downloader.extract_date_from_study_id("study_20230229_abc123")
+        result = extract_date_from_study_id("study_20230229_abc123")
         assert result is None
 
     def test_parse_date_ambiguous_format(self, downloader):
         """Test date parsing with ambiguous DD/MM vs MM/DD format."""
-        date_patterns = [r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b"]
-        month_map = {}
-
         # Test ambiguous date (both parts ≤ 12)
         # Should assume DD/MM/YYYY (European format)
-        result = downloader.parse_date_from_text("Date: 04/06/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 04/06/2024")
         assert result == "20240604"
 
         # Test unambiguous - second part > 12 (must be MM/DD)
-        result = downloader.parse_date_from_text("Date: 06/15/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 06/15/2024")
         assert result == "20240615"
 
         # Test unambiguous - first part > 12 (must be DD/MM)
-        result = downloader.parse_date_from_text("Date: 15/06/2024", date_patterns, month_map)
+        result = parse_date_from_text("Date: 15/06/2024")
         assert result == "20240615"
 
     def test_scrape_studies_resource_cleanup(self, downloader):
