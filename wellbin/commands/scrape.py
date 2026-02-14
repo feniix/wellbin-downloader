@@ -9,7 +9,7 @@ import click
 from dotenv import load_dotenv
 
 from ..core.scraper import WellbinMedicalDownloader
-from ..core.utils import get_env_default, validate_credentials
+from ..core.utils import get_env_or_default, validate_credentials
 
 # Load environment variables
 load_dotenv()
@@ -63,21 +63,21 @@ def resolve_config(
         config.email = email
         config.email_source = "CLI"
     else:
-        config.email = get_env_default("WELLBIN_EMAIL", "your-email@example.com")
+        config.email = get_env_or_default("WELLBIN_EMAIL", "your-email@example.com")
 
     # Resolve password
     if password is not None:
         config.password = password
         config.password_source = "CLI"
     else:
-        config.password = get_env_default("WELLBIN_PASSWORD", "your-password")
+        config.password = get_env_or_default("WELLBIN_PASSWORD", "your-password")
 
     # Resolve limit
     if limit is not None:
         config.limit = None if limit == 0 else limit
         config.limit_source = "CLI"
     else:
-        limit_val = get_env_default("WELLBIN_STUDY_LIMIT", "0", int)
+        limit_val = get_env_or_default("WELLBIN_STUDY_LIMIT", "0", int)
         config.limit = None if limit_val == 0 else limit_val
 
     # Resolve types
@@ -85,7 +85,7 @@ def resolve_config(
         config.study_types = _parse_study_types(types)
         config.types_source = "CLI"
     else:
-        types_str = get_env_default("WELLBIN_STUDY_TYPES", "FhirStudy")
+        types_str = get_env_or_default("WELLBIN_STUDY_TYPES", "FhirStudy")
         config.study_types = _parse_study_types(types_str)
 
     # Resolve output
@@ -93,14 +93,14 @@ def resolve_config(
         config.output_dir = output
         config.output_source = "CLI"
     else:
-        config.output_dir = get_env_default("WELLBIN_OUTPUT_DIR", "medical_data")
+        config.output_dir = get_env_or_default("WELLBIN_OUTPUT_DIR", "medical_data")
 
     # Resolve headless
     if headless is not None:
         config.headless = headless
         config.headless_source = "CLI"
     else:
-        config.headless = get_env_default("WELLBIN_HEADLESS", "true", bool)
+        config.headless = get_env_or_default("WELLBIN_HEADLESS", "true", bool)
 
     return config
 

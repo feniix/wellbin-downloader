@@ -7,6 +7,7 @@ optional logging integration.
 
 import logging
 import sys
+import traceback as tb_module
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
@@ -15,13 +16,25 @@ from typing import Any, Optional
 class LogLevel(Enum):
     """Log levels with emoji indicators."""
 
-    DEBUG = "🔍"
-    INFO = "ℹ️"
-    SUCCESS = "✅"
-    WARNING = "⚠️"
-    ERROR = "❌"
-    PROGRESS = "📊"
-    ACTION = "🎯"
+    DEBUG = "\U0001f50d"
+    INFO = "\u2139\ufe0f"
+    SUCCESS = "\u2705"
+    WARNING = "\u26a0\ufe0f"
+    ERROR = "\u274c"
+    PROGRESS = "\U0001f4ca"
+    ACTION = "\U0001f3af"
+
+
+# Mapping from LogLevel to Python logging levels
+_LOG_LEVEL_MAP: dict[LogLevel, int] = {
+    LogLevel.DEBUG: logging.DEBUG,
+    LogLevel.INFO: logging.INFO,
+    LogLevel.SUCCESS: logging.INFO,
+    LogLevel.WARNING: logging.WARNING,
+    LogLevel.ERROR: logging.ERROR,
+    LogLevel.PROGRESS: logging.INFO,
+    LogLevel.ACTION: logging.INFO,
+}
 
 
 @dataclass
@@ -98,6 +111,17 @@ class Output:
         if self._indent_level > 0:
             self._indent_level -= 1
 
+    def _log_to_logger(self, level: LogLevel, text: str) -> None:
+        """Log a message to the Python logger if configured.
+
+        Args:
+            level: Log level for determining Python logging level
+            text: Message text to log
+        """
+        if self._logger:
+            py_level = _LOG_LEVEL_MAP.get(level, logging.INFO)
+            self._logger.log(py_level, text)
+
     def message(self, level: LogLevel, text: str, **kwargs: Any) -> None:
         """Print a formatted message.
 
@@ -108,12 +132,57 @@ class Output:
         """
         emoji = self._get_emoji(level)
         formatted = text.format(**kwargs) if kwargs else text
-        output = f"{self._indent()}{emoji} {formatted}".strip()
+        prefix = f"{emoji} " if emoji else ""
+        output = f"{self._indent()}{prefix}{formatted}".strip()
 
         print(output)
+        self._log_to_logger(level, output)
 
+    def log(self, emoji: str, text: str, **kwargs: Any) -> None:
+        """Print a message with an arbitrary emoji prefix.
+
+        Used for domain-specific messages that don't map to a LogLevel
+        (e.g., dates, URLs, files, folders).
+
+        Args:
+            emoji: Emoji string to prefix the message
+            text: Message text
+            **kwargs: Additional format arguments
+        """
+        formatted = text.format(**kwargs) if kwargs else text
+        if self.config.use_emoji and emoji:
+            output = f"{self._indent()}{emoji} {formatted}".strip()
+        else:
+            output = f"{self._indent()}{formatted}".strip()
+
+        print(output)
+        self._log_to_logger(LogLevel.INFO, output)
+
+    def step(self, current: int, total: int, emoji: str, text: str) -> None:
+        """Print a progress step message.
+
+        Formats as: [current/total] emoji text
+
+        Args:
+            current: Current step number
+            total: Total number of steps
+            emoji: Emoji to display
+            text: Step description
+        """
+        if self.config.use_emoji and emoji:
+            output = f"{self._indent()}[{current}/{total}] {emoji} {text}"
+        else:
+            output = f"{self._indent()}[{current}/{total}] {text}"
+
+        print(output)
+        self._log_to_logger(LogLevel.INFO, output)
+
+    def traceback(self) -> None:
+        """Print the current exception traceback."""
+        tb_text = tb_module.format_exc()
+        print(tb_text)
         if self._logger:
-            self._logger.log(logging.INFO if level in (LogLevel.INFO, LogLevel.SUCCESS) else logging.WARNING, output)
+            self._logger.error(tb_text)
 
     def info(self, text: str, **kwargs: Any) -> None:
         """Print info message."""
@@ -150,9 +219,13 @@ class Output:
             text: Header text
             char: Character for separator line
         """
-        print(f"\n{char * self.config.line_width}")
+        sep = char * self.config.line_width
+        print(f"\n{sep}")
         print(text)
-        print(char * self.config.line_width)
+        print(sep)
+
+        if self._logger:
+            self._logger.info(text)
 
     def separator(self, char: str = "=") -> None:
         """Print a separator line.
@@ -160,7 +233,11 @@ class Output:
         Args:
             char: Character for separator
         """
-        print(char * self.config.line_width)
+        sep = char * self.config.line_width
+        print(sep)
+
+        if self._logger:
+            self._logger.info(sep)
 
     def blank(self) -> None:
         """Print blank line."""
@@ -187,7 +264,7 @@ class Output:
         if index is not None:
             print(f"{self._indent()}  {index}. {formatted}")
         else:
-            print(f"{self._indent()}  • {formatted}")
+            print(f"{self._indent()}  \u2022 {formatted}")
 
     def subitem(self, text: str, **kwargs: Any) -> None:
         """Print sub-item (additional indented item).
@@ -230,6 +307,12 @@ def configure_output(config: Optional[OutputConfig] = None) -> Output:
     return _output
 
 
+def reset_output() -> None:
+    """Reset the global output instance. Useful for testing."""
+    global _output
+    _output = None
+
+
 # Convenience functions using global instance
 def info(text: str, **kwargs: Any) -> None:
     """Print info message using global output."""
@@ -259,6 +342,11 @@ def debug(text: str, **kwargs: Any) -> None:
 def progress(text: str, **kwargs: Any) -> None:
     """Print progress message using global output."""
     get_output().progress(text, **kwargs)
+
+
+def log(emoji: str, text: str, **kwargs: Any) -> None:
+    """Print message with arbitrary emoji using global output."""
+    get_output().log(emoji, text, **kwargs)
 
 
 def header(text: str, char: str = "=") -> None:

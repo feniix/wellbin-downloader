@@ -13,6 +13,8 @@ from typing import Any, Optional, Union
 
 import pymupdf4llm
 
+from .logging import Output, get_output
+
 
 @dataclass
 class ConversionStats:
@@ -55,6 +57,7 @@ class PDFToMarkdownConverter:
         self.pdf_dir = Path(pdf_dir)
         self.output_dir = Path(output_dir)
         self.enhanced_mode = enhanced_mode
+        self.out: Output = get_output()
 
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -185,7 +188,7 @@ class PDFToMarkdownConverter:
                 return pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector)
 
         except Exception as e:
-            print(f"❌ Error extracting markdown from {pdf_path}: {e}")
+            self.out.error(f"Error extracting markdown from {pdf_path}: {e}")
             return None
 
     def save_enhanced_chunks(self, chunks: Union[str, list[dict[str, Any]]], pdf_path: Path) -> list[Path]:
@@ -234,7 +237,7 @@ class PDFToMarkdownConverter:
 
                 # Page section header
                 page_header = f"""
-## 📄 Page {page_num}
+## \U0001f4c4 Page {page_num}
 
 **Page Number:** {page_num} of {total_pages}
 **Tables on Page:** {len(page_tables)}
@@ -266,7 +269,7 @@ Total words: {len(all_words)}
 -->
 
 <details>
-<summary>📊 Word Position Data (Click to expand)</summary>
+<summary>\U0001f4ca Word Position Data (Click to expand)</summary>
 
 ```json
 {json.dumps(all_words, indent=2)}
@@ -334,30 +337,30 @@ Total words: {len(all_words)}
             return converted_files
 
         except Exception as e:
-            print(f"  ❌ Error converting {pdf_path.name}: {e}")
+            self.out.error(f"  Error converting {pdf_path.name}: {e}")
             return None
 
     def _print_conversion_start(self, pdf_path: Path) -> None:
         """Print conversion start message."""
-        print(f"📄 Converting {pdf_path.name}...")
+        self.out.log("\U0001f4c4", f"Converting {pdf_path.name}...")
         if self.enhanced_mode:
-            print("  🎯 Enhanced mode: embedded page chunks + tables + word positions (no images)")
+            self.out.action("  Enhanced mode: embedded page chunks + tables + word positions (no images)")
 
     def _print_conversion_summary(self, converted_files: list[Path]) -> None:
         """Print summary of converted files."""
         total_size = sum(f.stat().st_size for f in converted_files)
-        print(f"  ✅ Saved {len(converted_files)} files ({total_size:,} bytes)")
+        self.out.success(f"  Saved {len(converted_files)} files ({total_size:,} bytes)")
 
     def _print_feature_stats(self, result: list[dict[str, Any]]) -> None:
         """Print statistics about extracted features."""
         stats = self._calculate_feature_stats(result)
 
-        print(f"  📊 Processed {stats.pages_processed} pages with rich metadata")
+        self.out.progress(f"  Processed {stats.pages_processed} pages with rich metadata")
 
         if stats.tables_found > 0:
-            print(f"  📋 Found {stats.tables_found} tables across all pages")
+            self.out.log("\U0001f4cb", f"  Found {stats.tables_found} tables across all pages")
         if stats.words_extracted > 0:
-            print(f"  📝 Extracted {stats.words_extracted} words with positions")
+            self.out.log("\U0001f4dd", f"  Extracted {stats.words_extracted} words with positions")
 
     def _calculate_feature_stats(self, result: list[dict[str, Any]]) -> ConversionStats:
         """Calculate statistics from conversion result.
@@ -400,12 +403,12 @@ Total words: {len(all_words)}
             List of PDF paths, None if directory doesn't exist or is empty
         """
         if not self.pdf_dir.exists():
-            print(f"❌ PDF directory {self.pdf_dir} not found")
+            self.out.error(f"PDF directory {self.pdf_dir} not found")
             return None
 
         pdf_files = list(self.pdf_dir.glob("*.pdf"))
         if not pdf_files:
-            print(f"❌ No PDF files found in {self.pdf_dir}")
+            self.out.error(f"No PDF files found in {self.pdf_dir}")
             return None
 
         return pdf_files
@@ -413,10 +416,10 @@ Total words: {len(all_words)}
     def _print_batch_start(self, pdf_files: list[Path]) -> None:
         """Print batch conversion start information."""
         mode_desc = "Enhanced (embedded chunks + tables + words)" if self.enhanced_mode else "Standard"
-        print(f"🔄 Found {len(pdf_files)} PDF files to convert")
-        print(f"🎯 Mode: {mode_desc}")
-        print(f"📁 Output directory: {self.output_dir}")
-        print("=" * 60)
+        self.out.log("\U0001f504", f"Found {len(pdf_files)} PDF files to convert")
+        self.out.action(f"Mode: {mode_desc}")
+        self.out.log("\U0001f4c1", f"Output directory: {self.output_dir}")
+        self.out.separator()
 
     def _process_all_pdfs(self, pdf_files: list[Path]) -> ConversionResult:
         """Process all PDF files and return results.
@@ -450,16 +453,14 @@ Total words: {len(all_words)}
             result: Conversion statistics
             pdf_files: Original list of PDF files
         """
-        print("\n" + "=" * 60)
-        print("🎉 CONVERSION COMPLETE!")
-        print("=" * 60)
-        print(f"✅ Successfully converted: {result.successful} PDFs")
-        print(f"📄 Total markdown files: {len(result.successful_files)}")
+        self.out.header("\U0001f389 CONVERSION COMPLETE!")
+        self.out.success(f"Successfully converted: {result.successful} PDFs")
+        self.out.log("\U0001f4c4", f"Total markdown files: {len(result.successful_files)}")
 
         if result.failed > 0:
-            print(f"❌ Failed conversions: {result.failed} files")
+            self.out.error(f"Failed conversions: {result.failed} files")
             for failed in result.failed_files:
-                print(f"   - {failed.name}")
+                self.out.log("", f"   - {failed.name}")
 
         if result.successful > 0:
             self._print_results_summary(result)
@@ -470,14 +471,16 @@ Total words: {len(all_words)}
         Args:
             result: Conversion statistics
         """
-        print("\n📊 Results:")
-        print(f"   📁 Output directory: {self.output_dir}")
-        print(f"   💾 Total size: {result.total_bytes:,} bytes ({result.total_bytes / 1024 / 1024:.2f} MB)")
+        self.out.blank()
+        self.out.progress("Results:")
+        self.out.log("\U0001f4c1", f"   Output directory: {self.output_dir}")
+        size_mb = result.total_bytes / 1024 / 1024
+        self.out.log("\U0001f4be", f"   Total size: {result.total_bytes:,} bytes ({size_mb:.2f} MB)")
 
         if self.enhanced_mode:
-            print("   🎯 Enhanced features: ✓")
-            print("   📑 Page chunks: Embedded as sections in single files")
-            print("   📊 Word positions: Embedded in footer sections")
+            self.out.action("   Enhanced features: \u2713")
+            self.out.log("\U0001f4d1", "   Page chunks: Embedded as sections in single files")
+            self.out.progress("   Word positions: Embedded in footer sections")
 
 
 def convert_structured_directories(
@@ -486,6 +489,7 @@ def convert_structured_directories(
     """Convert PDFs from structured directories maintaining organization"""
     converted_files: list[Path] = []
     input_path = Path(input_dir)
+    out = get_output()
 
     # Define subdirectory mappings
     type_mapping: dict[str, str] = {"lab_reports": "lab", "imaging_reports": "imaging"}
@@ -499,10 +503,10 @@ def convert_structured_directories(
 
         # Skip if file type filter doesn't match
         if file_type != "all" and file_type != report_type:
-            print(f"⏭️  Skipping {subdir_name}/ (filtered out)")
+            out.log("\u23ed\ufe0f", f" Skipping {subdir_name}/ (filtered out)")
             continue
 
-        print(f"📁 Processing {subdir_name}/...")
+        out.log("\U0001f4c1", f"Processing {subdir_name}/...")
 
         # Create corresponding output subdirectory
         output_subdir = Path(output_dir) / f"{subdir_name}_markdown"
@@ -514,6 +518,6 @@ def convert_structured_directories(
         converted_files.extend(subdir_files)
 
         if subdir_files:
-            print(f"  ✅ Converted {len(subdir_files)} files from {subdir_name}/")
+            out.success(f"  Converted {len(subdir_files)} files from {subdir_name}/")
 
     return converted_files

@@ -1,11 +1,11 @@
 """
-Tests for wellbin.core.output module.
+Tests for wellbin.core.formatting module.
 """
 
 from io import StringIO
 from unittest.mock import patch
 
-from wellbin.core.output import (
+from wellbin.core.formatting import (
     DOMAIN_EMOJIS,
     EMOJI_PREFIXES,
     OutputLevel,

@@ -7,59 +7,9 @@ from unittest.mock import patch
 
 from wellbin.core.utils import (
     create_config_file,
-    get_env_default,
     get_env_or_default,
     validate_credentials,
 )
-
-
-class TestGetEnvDefault:
-    """Tests for get_env_default function."""
-
-    def test_get_env_default_with_existing_value(self):
-        """Test getting existing environment variable."""
-        with patch.dict(os.environ, {"TEST_VAR": "test_value"}):
-            result = get_env_default("TEST_VAR", "default_value")
-            assert result == "test_value"
-
-    def test_get_env_default_with_missing_value(self):
-        """Test fallback to default when env var is missing."""
-        result = get_env_default("NONEXISTENT_VAR", "default_value")
-        assert result == "default_value"
-
-    def test_get_env_default_with_empty_value(self):
-        """Test fallback to default when env var is empty."""
-        with patch.dict(os.environ, {"EMPTY_VAR": ""}):
-            result = get_env_default("EMPTY_VAR", "default_value")
-            assert result == "default_value"
-
-    def test_get_env_default_with_whitespace_value(self):
-        """Test fallback to default when env var contains only whitespace."""
-        with patch.dict(os.environ, {"WHITESPACE_VAR": "   "}):
-            result = get_env_default("WHITESPACE_VAR", "default_value")
-            assert result == "default_value"
-
-    def test_get_env_default_int_conversion(self):
-        """Test integer type conversion."""
-        with patch.dict(os.environ, {"INT_VAR": "42"}):
-            result = get_env_default("INT_VAR", "0", int)
-            assert result == 42
-
-    def test_get_env_default_bool_conversion_true(self):
-        """Test boolean type conversion for true values."""
-        test_cases = ["true", "True", "TRUE", "1", "yes", "YES", "on", "ON"]
-        for value in test_cases:
-            with patch.dict(os.environ, {"BOOL_VAR": value}):
-                result = get_env_default("BOOL_VAR", False, bool)
-                assert result is True, f"Failed for value: {value}"
-
-    def test_get_env_default_bool_conversion_false(self):
-        """Test boolean type conversion for false values."""
-        test_cases = ["false", "False", "FALSE", "0", "no", "NO", "off", "OFF"]
-        for value in test_cases:
-            with patch.dict(os.environ, {"BOOL_VAR": value}):
-                result = get_env_default("BOOL_VAR", True, bool)
-                assert result is False, f"Failed for value: {value}"
 
 
 class TestGetEnvOrDefault:
@@ -86,6 +36,34 @@ class TestGetEnvOrDefault:
         """Test integer fallback when env var is missing."""
         result = get_env_or_default("MISSING_INT_VAR", 50, int)
         assert result == 50
+
+    def test_get_env_or_default_with_empty_value(self):
+        """Test fallback to default when env var is empty."""
+        with patch.dict(os.environ, {"EMPTY_VAR": ""}):
+            result = get_env_or_default("EMPTY_VAR", "default_value")
+            assert result == "default_value"
+
+    def test_get_env_or_default_with_whitespace_value(self):
+        """Test fallback to default when env var contains only whitespace."""
+        with patch.dict(os.environ, {"WHITESPACE_VAR": "   "}):
+            result = get_env_or_default("WHITESPACE_VAR", "default_value")
+            assert result == "default_value"
+
+    def test_get_env_or_default_bool_conversion_true(self):
+        """Test boolean type conversion for true values."""
+        test_cases = ["true", "True", "TRUE", "1", "yes", "YES", "on", "ON"]
+        for value in test_cases:
+            with patch.dict(os.environ, {"BOOL_VAR": value}):
+                result = get_env_or_default("BOOL_VAR", False, bool)
+                assert result is True, f"Failed for value: {value}"
+
+    def test_get_env_or_default_bool_conversion_false(self):
+        """Test boolean type conversion for false values."""
+        test_cases = ["false", "False", "FALSE", "0", "no", "NO", "off", "OFF"]
+        for value in test_cases:
+            with patch.dict(os.environ, {"BOOL_VAR": value}):
+                result = get_env_or_default("BOOL_VAR", True, bool)
+                assert result is False, f"Failed for value: {value}"
 
 
 class TestValidateCredentials:

@@ -8,6 +8,7 @@ from the Wellbin platform with support for FhirStudy and DicomStudy types.
 import os
 import re
 import time
+import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -18,6 +19,8 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+
+from .logging import Output, get_output
 
 
 @dataclass
@@ -69,19 +72,20 @@ class WellbinMedicalDownloader:
         self.output_dir = output_dir
         self.study_dates: dict[str, str] = {}  # Map study URLs to dates
         self.date_counters: defaultdict[str, int] = defaultdict(int)  # For deduplication per study type
+        self.out: Output = get_output()
 
         # Study type configuration
         self.study_config: dict[str, dict[str, str]] = {
             "FhirStudy": {
                 "name": "lab",
                 "description": "Laboratory Reports",
-                "icon": "🧪",
+                "icon": "\U0001f9ea",
                 "subdir": "lab_reports",
             },
             "DicomStudy": {
                 "name": "imaging",
                 "description": "Medical Imaging",
-                "icon": "🩻",
+                "icon": "\U0001fa7b",
                 "subdir": "imaging_reports",
             },
         }
@@ -111,6 +115,17 @@ class WellbinMedicalDownloader:
 
     DEFAULT_DATE: str = "20240101"
     KNOWN_STUDY_TYPES: tuple[str, ...] = ("FhirStudy", "DicomStudy")
+    USER_AGENT: str = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+    PARENT_CONTAINER_XPATH: str = (
+        "./ancestor::*[contains(@class, 'study') or "
+        "contains(@class, 'card') or "
+        "contains(@class, 'item') or "
+        "contains(@class, 'row')][1]"
+    )
 
     @staticmethod
     def _is_valid_date(year: int, month: int, day: int) -> bool:
@@ -165,33 +180,28 @@ class WellbinMedicalDownloader:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
-        user_agent = (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
-        chrome_options.add_argument(f"--user-agent={user_agent}")
+        chrome_options.add_argument(f"--user-agent={self.USER_AGENT}")
 
-        print("🔧 Setting up Chrome driver...")
+        self.out.log("\U0001f527", "Setting up Chrome driver...")
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.implicitly_wait(10)
         self.wait = WebDriverWait(self.driver, 15)
-        print("✅ Chrome driver ready")
+        self.out.success("Chrome driver ready")
 
     def login(self) -> bool:
         """Login to Wellbin"""
         try:
-            print("🔐 Logging into Wellbin...")
+            self.out.log("\U0001f510", "Logging into Wellbin...")
             self.setup_driver()
 
             # Navigate to login page
-            print(f"📍 Navigating to: {self.login_url}")
+            self.out.log("\U0001f4cd", f"Navigating to: {self.login_url}")
             assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.login_url)
             time.sleep(2)
 
             # Fill login form
-            print("📝 Filling login credentials...")
+            self.out.log("\U0001f4dd", "Filling login credentials...")
             email_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='email']")
             password_field = self.driver.find_element(By.CSS_SELECTOR, "input[type='password']")
 
@@ -201,7 +211,7 @@ class WellbinMedicalDownloader:
             password_field.send_keys(self.password)
 
             # Submit form
-            print("🚀 Submitting login form...")
+            self.out.log("\U0001f680", "Submitting login form...")
             submit_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
             submit_button.click()
 
@@ -209,48 +219,44 @@ class WellbinMedicalDownloader:
 
             # Verify login success
             current_url = self.driver.current_url
-            print(f"📍 After login, current URL: {current_url}")
+            self.out.log("\U0001f4cd", f"After login, current URL: {current_url}")
 
             if "dashboard" in current_url.lower():
-                print("✅ Login successful!")
+                self.out.success("Login successful!")
                 return True
             else:
-                print(f"❌ Login failed. Expected dashboard URL, got: {current_url}")
+                self.out.error(f"Login failed. Expected dashboard URL, got: {current_url}")
                 return False
 
         except NoSuchElementException as e:
-            print(f"❌ Login form element not found: {e}")
-            print("   Check if login page structure has changed")
+            self.out.error(f"Login form element not found: {e}")
+            self.out.log("", "  Check if login page structure has changed")
             return False
         except Exception as e:
-            print(f"❌ Unexpected error during login: {type(e).__name__}: {e}")
-            import traceback
-
-            print(traceback.format_exc())
+            self.out.error(f"Unexpected error during login: {type(e).__name__}: {e}")
+            self.out.traceback()
             return False
 
     def extract_study_dates_from_explorer(self) -> bool:
         """Extract study dates from the explorer page."""
         try:
-            print("📅 Extracting study dates from explorer page...")
+            self.out.log("\U0001f4c5", "Extracting study dates from explorer page...")
             assert self.driver is not None, "Driver should be initialized"  # nosec
             self.driver.get(self.explorer_url)
             time.sleep(3)
 
             study_elements = self.driver.find_elements(By.XPATH, "//a[contains(@href, '/study/')]")
-            print(f"🔍 Found {len(study_elements)} study elements, extracting dates...")
+            self.out.debug(f"Found {len(study_elements)} study elements, extracting dates...")
 
             for element in study_elements:
                 self._extract_date_from_study_element(element)
 
-            print(f"📊 Extracted dates for {len(self.study_dates)} studies")
+            self.out.progress(f"Extracted dates for {len(self.study_dates)} studies")
             return True
 
         except Exception as e:
-            print(f"❌ Error extracting study dates: {type(e).__name__}: {e}")
-            import traceback
-
-            print(f"Traceback: {traceback.format_exc()}")
+            self.out.error(f"Error extracting study dates: {type(e).__name__}: {e}")
+            self.out.log("\U0001f50d", f"Traceback: {traceback.format_exc()}")
             return False
 
     def _extract_date_from_study_element(self, element: Any) -> None:
@@ -277,7 +283,7 @@ class WellbinMedicalDownloader:
             self._log_date_extraction(href, study_date)
 
         except Exception as e:
-            print(f"  ❌ Error extracting date for element: {type(e).__name__}: {e}")
+            self.out.error(f"  Error extracting date for element: {type(e).__name__}: {e}")
 
     def _get_study_container_text(self, element: Any, href: str) -> str:
         """Get container text for a study element.
@@ -290,13 +296,7 @@ class WellbinMedicalDownloader:
             Combined text from container and nearby elements
         """
         try:
-            parent_xpath = (
-                "./ancestor::*[contains(@class, 'study') or "
-                "contains(@class, 'card') or "
-                "contains(@class, 'item') or "
-                "contains(@class, 'row')][1]"
-            )
-            parent = element.find_element(By.XPATH, parent_xpath)
+            parent = element.find_element(By.XPATH, self.PARENT_CONTAINER_XPATH)
             container_text = parent.text if parent else element.text
 
             # Add nearby date text
@@ -306,7 +306,7 @@ class WellbinMedicalDownloader:
             return container_text
 
         except Exception as e:  # noqa: S110
-            print(f"    ⚠️  Could not extract nearby date elements: {type(e).__name__}")
+            self.out.warning(f"  Could not extract nearby date elements: {type(e).__name__}")
             return element.text if element else ""
 
     def parse_date_from_text(
@@ -446,10 +446,10 @@ class WellbinMedicalDownloader:
                 self.study_dates[href] = date
                 self._log_date_extraction(href, date)
 
-            print(f"📊 Extracted dates for {len(self.study_dates)} studies")
+            self.out.progress(f"Extracted dates for {len(self.study_dates)} studies")
 
         except Exception as e:
-            print(f"❌ Error extracting study dates: {e}")
+            self.out.error(f"Error extracting study dates: {e}")
 
     def _extract_date_for_single_study(self, href: str) -> str:
         """Extract date for a single study URL.
@@ -476,7 +476,7 @@ class WellbinMedicalDownloader:
             return self._get_fallback_date(href)
 
         except Exception as e:
-            print(f"  ❌ Error extracting date for {href}: {e}")
+            self.out.error(f"  Error extracting date for {href}: {e}")
             return self.DEFAULT_DATE
 
     def _extract_container_text(self, element: Any, href_xpath: str) -> str:
@@ -490,13 +490,7 @@ class WellbinMedicalDownloader:
             Combined text from container and nearby elements
         """
         try:
-            parent_xpath = (
-                "./ancestor::*[contains(@class, 'study') or "
-                "contains(@class, 'card') or "
-                "contains(@class, 'item') or "
-                "contains(@class, 'row')][1]"
-            )
-            parent = element.find_element(By.XPATH, parent_xpath)
+            parent = element.find_element(By.XPATH, self.PARENT_CONTAINER_XPATH)
             container_text = parent.text if parent else element.text
 
             # Add text from child elements that might contain dates
@@ -506,7 +500,7 @@ class WellbinMedicalDownloader:
             return container_text
 
         except Exception as e:
-            print(f"    ⚠️  Could not extract container text: {type(e).__name__}")
+            self.out.warning(f"    Could not extract container text: {type(e).__name__}")
             return element.text if element else ""
 
     def _collect_date_like_text(self, parent: Any) -> str:
@@ -526,7 +520,7 @@ class WellbinMedicalDownloader:
                 if elem_text and self._looks_like_date_text(elem_text):
                     additional_text += " " + elem_text
         except Exception as e:  # noqa: S110
-            print(f"    ⚠️  Could not extract date patterns from parent: {type(e).__name__}")
+            self.out.warning(f"    Could not extract date patterns from parent: {type(e).__name__}")
         return additional_text
 
     def _collect_nearby_date_text(self, href_xpath: str) -> str:
@@ -593,66 +587,38 @@ class WellbinMedicalDownloader:
             date: Extracted date string
         """
         if date == self.DEFAULT_DATE:
-            print(f"  ⚠️  {href} -> {date} (fallback)")
+            self.out.warning(f"  {href} -> {date} (fallback)")
         else:
-            print(f"  📅 {href} -> {date}")
+            self.out.log("\U0001f4c5", f"  {href} -> {date}")
 
     def extract_date_from_study_page(self, study_url: str) -> str:
         """Extract date from the study page using the item-value report-date class"""
         try:
             assert self.driver is not None, "Driver should be initialized"  # nosec
-            # Look for the div with class "item-value report-date"
             date_element = self.driver.find_element(By.CSS_SELECTOR, "div.item-value.report-date")
             date_text = date_element.text.strip()
 
             if date_text:
-                print(f"    🔍 Found date text: '{date_text}'")
-
-                # Parse the date using our existing parsing logic
-                date_patterns = [
-                    r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",  # MM/DD/YYYY or DD/MM/YYYY
-                    r"\b(\d{4})[/-](\d{1,2})[/-](\d{1,2})\b",  # YYYY/MM/DD
-                    r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",  # DD Mon YYYY
-                    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\b",  # Mon DD, YYYY
-                ]
-
-                month_map = {
-                    "Jan": "01",
-                    "Feb": "02",
-                    "Mar": "03",
-                    "Apr": "04",
-                    "May": "05",
-                    "Jun": "06",
-                    "Jul": "07",
-                    "Aug": "08",
-                    "Sep": "09",
-                    "Oct": "10",
-                    "Nov": "11",
-                    "Dec": "12",
-                }
-
-                parsed_date = self.parse_date_from_text(date_text, date_patterns, month_map)
+                self.out.debug(f"    Found date text: '{date_text}'")
+                parsed_date = self.parse_date_from_text(date_text)
                 if parsed_date:
                     return parsed_date
 
             # Fallback to study ID extraction if date parsing fails
-            study_id_match = re.search(r"/study/([^?]+)", study_url)
-            if study_id_match:
-                study_id = study_id_match.group(1)
-                fallback_date = self.extract_date_from_study_id(study_id)
-                if fallback_date:
-                    print(f"    ⚠️  Using fallback date from ID: {fallback_date}")
-                    return fallback_date
+            fallback_date = self._get_fallback_date(study_url)
+            if fallback_date != self.DEFAULT_DATE:
+                self.out.warning(f"    Using fallback date from ID: {fallback_date}")
+                return fallback_date
 
-            print("    ⚠️  No date found, using default")
-            return "20240101"  # Default fallback
+            self.out.warning("    No date found, using default")
+            return self.DEFAULT_DATE
 
         except NoSuchElementException:
-            print("    ❌ Could not find div.item-value.report-date element")
-            return "20240101"  # Default fallback
+            self.out.error("    Could not find div.item-value.report-date element")
+            return self.DEFAULT_DATE
         except Exception as e:
-            print(f"    ❌ Error extracting date from study page: {e}")
-            return "20240101"  # Default fallback
+            self.out.error(f"    Error extracting date from study page: {e}")
+            return self.DEFAULT_DATE  # Default fallback
 
     def get_study_links(self) -> list[str]:
         """Get study links from the explorer page, filtered by study type."""
@@ -664,35 +630,35 @@ class WellbinMedicalDownloader:
             return self._apply_study_limit(study_links)
 
         except Exception as e:
-            print(f"❌ Error getting study links: {e}")
+            self.out.error(f"Error getting study links: {e}")
             return []
 
     def _navigate_to_explorer(self) -> None:
         """Navigate to the explorer page."""
-        print("🔍 Navigating to Explorer to find studies...")
-        print(f"📍 Going to: {self.explorer_url}")
+        self.out.debug("Navigating to Explorer to find studies...")
+        self.out.log("\U0001f4cd", f"Going to: {self.explorer_url}")
         assert self.driver is not None, "Driver should be initialized"  # nosec
         self.driver.get(self.explorer_url)
         time.sleep(3)
-        print(f"📍 Explorer page URL: {self.driver.current_url}")
+        self.out.log("\U0001f4cd", f"Explorer page URL: {self.driver.current_url}")
 
     def _collect_study_links(self) -> list[str]:
         """Collect and filter study links from the current page."""
-        print("🔎 Searching for study links...")
+        self.out.log("\U0001f50e", "Searching for study links...")
         assert self.driver is not None, "Driver should be initialized"  # nosec
         all_links = self.driver.find_elements(By.TAG_NAME, "a")
-        print(f"📊 Found {len(all_links)} total links on page")
+        self.out.progress(f"Found {len(all_links)} total links on page")
 
-        print(f"🎯 Filtering for study types: {', '.join(self.study_types)}")
+        self.out.action(f"Filtering for study types: {', '.join(self.study_types)}")
 
         study_links: list[str] = []
         for link in all_links:
             href = self._extract_valid_study_link(link)
             if href and self._matches_study_type(href, self.study_types):
                 study_links.append(href)
-                print(f"  ✅ Found: {href}")
+                self.out.success(f"  Found: {href}")
 
-        print(f"📊 Found {len(study_links)} matching study links")
+        self.out.progress(f"Found {len(study_links)} matching study links")
         return study_links
 
     def _extract_valid_study_link(self, link: Any) -> Optional[str]:
@@ -702,13 +668,13 @@ class WellbinMedicalDownloader:
             if href and "study/" in href:
                 return href
         except Exception as e:
-            print(f"  ❌ Error processing link: {e}")
+            self.out.error(f"  Error processing link: {e}")
         return None
 
     def _apply_study_limit(self, study_links: list[str]) -> list[str]:
         """Apply study limit if configured."""
         if self.limit_studies and len(study_links) > self.limit_studies:
-            print(f"🔢 Limiting to {self.limit_studies} studies (found {len(study_links)})")
+            self.out.log("\U0001f522", f"Limiting to {self.limit_studies} studies (found {len(study_links)})")
             return study_links[: self.limit_studies]
         return study_links
 
@@ -733,7 +699,7 @@ class WellbinMedicalDownloader:
             return self._find_pdf_download_links(study_url, study_type, study_date)
 
         except Exception as e:
-            print(f"  ❌ Error processing study {study_url}: {e}")
+            self.out.error(f"  Error processing study {study_url}: {e}")
             return []
 
     def _extract_study_type(self, study_url: str) -> str:
@@ -757,8 +723,9 @@ class WellbinMedicalDownloader:
             total: Total number of studies
             study_type: Type of study
         """
-        print(f"\n[{index}/{total}] 📄 Processing {study_type} study:")
-        print(f"  🔗 URL: {study_url}")
+        self.out.blank()
+        self.out.step(index, total, "\U0001f4c4", f"Processing {study_type} study:")
+        self.out.log("\U0001f517", f"  URL: {study_url}")
 
     def _navigate_to_study(self, study_url: str) -> None:
         """Navigate to study page.
@@ -769,7 +736,7 @@ class WellbinMedicalDownloader:
         assert self.driver is not None, "Driver should be initialized"  # nosec
         self.driver.get(study_url)
         time.sleep(1)
-        print(f"  📍 Loaded URL: {self.driver.current_url}")
+        self.out.log("\U0001f4cd", f"  Loaded URL: {self.driver.current_url}")
 
     def _extract_study_date(self, study_url: str) -> str:
         """Extract and print study date.
@@ -781,7 +748,7 @@ class WellbinMedicalDownloader:
             Study date string
         """
         study_date = self.extract_date_from_study_page(study_url)
-        print(f"  📅 Study date: {study_date}")
+        self.out.log("\U0001f4c5", f"  Study date: {study_date}")
         return study_date
 
     def _find_pdf_download_links(self, study_url: str, study_type: str, study_date: str) -> list[dict[str, Any]]:
@@ -795,7 +762,7 @@ class WellbinMedicalDownloader:
         Returns:
             List of PDF download info dictionaries
         """
-        print("  🔍 Looking for 'Descargar estudio' button...")
+        self.out.debug("  Looking for 'Descargar estudio' button...")
 
         try:
             elements = self._find_s3_download_elements()
@@ -804,11 +771,11 @@ class WellbinMedicalDownloader:
                 return self._process_download_element(elements[0], study_url, study_type, study_date)
 
             self._print_available_links()
-            print("  ❌ No S3 download link found")
+            self.out.error("  No S3 download link found")
             return []
 
         except Exception as e:
-            print(f"  ❌ Error finding download link: {e}")
+            self.out.error(f"  Error finding download link: {e}")
             return []
 
     def _find_s3_download_elements(self) -> list[Any]:
@@ -823,7 +790,7 @@ class WellbinMedicalDownloader:
         if elements:
             href = elements[0].get_attribute("href")
             text = elements[0].text.strip()
-            print(f"  ✅ Found S3 download link: '{text}' -> {href and href[:100]}...")
+            self.out.success(f"  Found S3 download link: '{text}' -> {href and href[:100]}...")
 
         return elements
 
@@ -844,7 +811,7 @@ class WellbinMedicalDownloader:
         href = element.get_attribute("href")
         text = element.text.strip() or "Download"
 
-        print(f"  ✅ Found download link: {href and href[:100]}...")
+        self.out.success(f"  Found download link: {href and href[:100]}...")
 
         return [
             {
@@ -858,43 +825,19 @@ class WellbinMedicalDownloader:
 
     def _print_available_links(self) -> None:
         """Print available links on page for debugging."""
-        print("  🔍 All links on page:")
+        self.out.debug("  All links on page:")
         assert self.driver is not None, "Driver should be initialized"  # nosec
         all_links = self.driver.find_elements(By.TAG_NAME, "a")[:10]
 
         for i, link in enumerate(all_links, 1):
             href = link.get_attribute("href")
             text = link.text.strip()
-            print(f"    {i}. '{text}' -> {href[:80] if href else 'No href'}...")
-
-    def _extract_study_type_from_url(self, url: str) -> str:
-        """Extract study type from URL parameter.
-
-        Args:
-            url: Study URL containing type parameter
-
-        Returns:
-            Study type string or "Unknown"
-        """
-        type_match = re.search(r"type=([^&]+)", url)
-        return type_match.group(1) if type_match else "Unknown"
-
-    def _print_study_header(self, study_type: str, study_url: str, index: int, total: int) -> None:
-        """Print study processing header.
-
-        Args:
-            study_type: Type of study being processed
-            study_url: URL of the study
-            index: Current study index
-            total: Total number of studies
-        """
-        print(f"\n[{index}/{total}] 📄 Processing {study_type} study:")
-        print(f"  🔗 URL: {study_url}")
+            self.out.log("", f"    {i}. '{text}' -> {href[:80] if href else 'No href'}...")
 
     def generate_filename(self, study_date: str, study_type: str) -> str:
         """Generate filename with deduplication using format YYYYMMDD-{type}-N.pdf"""
         if study_date == "unknown":
-            study_date = "20240101"  # Fallback
+            study_date = self.DEFAULT_DATE
 
         # Get study type configuration
         config = self.study_config.get(study_type, {"name": "unknown"})
@@ -919,31 +862,28 @@ class WellbinMedicalDownloader:
         """Download a PDF file"""
         try:
             study_date = pdf_info["study_date"]
-            print(f"\n[{download_index}/{total_downloads}] 📥 Downloading {pdf_info['study_type']} PDF ({study_date}):")
-            print(f"  📝 Description: {pdf_info['text']}")
-            print(f"  🔗 URL: {pdf_info['url'][:100]}...")
+            self.out.blank()
+            desc = f"Downloading {pdf_info['study_type']} PDF ({study_date}):"
+            self.out.step(download_index, total_downloads, "\U0001f4e5", desc)
+            self.out.log("\U0001f4dd", f"  Description: {pdf_info['text']}")
+            self.out.log("\U0001f517", f"  URL: {pdf_info['url'][:100]}...")
 
             # S3 URLs are pre-signed, no authentication needed
-            user_agent = (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-            headers = {"User-Agent": user_agent}
+            headers = {"User-Agent": self.USER_AGENT}
 
-            print("  🌐 Making download request...")
+            self.out.log("\U0001f310", "  Making download request...")
             response = self.session.get(pdf_info["url"], headers=headers, stream=True)
-            print(f"  📊 Response status: {response.status_code}")
+            self.out.progress(f"  Response status: {response.status_code}")
 
             if response.status_code != 200:
-                print(f"  ❌ Bad response status: {response.status_code}")
+                self.out.error(f"  Bad response status: {response.status_code}")
                 return None
 
             response.raise_for_status()
 
             # Generate filename based on study date and type
             filename = self.generate_filename(study_date, pdf_info["study_type"])
-            print(f"  📁 Generated filename: {filename}")
+            self.out.log("\U0001f4c1", f"  Generated filename: {filename}")
 
             # Create output directories
             config = self.study_config.get(pdf_info["study_type"], {"subdir": "unknown"})
@@ -952,7 +892,7 @@ class WellbinMedicalDownloader:
             filepath = os.path.join(output_subdir, filename)
 
             # Download file
-            print(f"  💾 Saving to: {filepath}")
+            self.out.log("\U0001f4be", f"  Saving to: {filepath}")
             file_size = 0
             with open(filepath, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -960,15 +900,13 @@ class WellbinMedicalDownloader:
                         f.write(chunk)
                         file_size += len(chunk)
 
-            print("  ✅ Downloaded successfully!")
-            print(f"  📏 File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
+            self.out.success("  Downloaded successfully!")
+            self.out.log("\U0001f4cf", f"  File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
             return filepath
 
         except Exception as e:
-            print(f"  ❌ Failed to download PDF: {e}")
-            import traceback
-
-            print(f"  🔍 Traceback: {traceback.format_exc()}")
+            self.out.error(f"  Failed to download PDF: {e}")
+            self.out.log("\U0001f50d", f"  Traceback: {traceback.format_exc()}")
             return None
 
     def scrape_studies(self) -> list[dict[str, Any]]:
@@ -981,27 +919,27 @@ class WellbinMedicalDownloader:
 
             study_links = self.get_study_links()
             if not study_links:
-                print("❌ No study links found matching the filter")
+                self.out.error("No study links found matching the filter")
                 return downloaded_files
 
-            print(f"\n🎯 Processing {len(study_links)} studies...")
+            self.out.blank()
+            self.out.action(f"Processing {len(study_links)} studies...")
 
             all_pdf_links = self._collect_all_pdf_links(study_links)
             if not all_pdf_links:
-                print("❌ No PDF links found in any studies")
+                self.out.error("No PDF links found in any studies")
                 return downloaded_files
 
-            print(f"\n📊 Found {len(all_pdf_links)} total PDF files to download")
-            print("=" * 60)
+            self.out.blank()
+            self.out.progress(f"Found {len(all_pdf_links)} total PDF files to download")
+            self.out.separator()
 
             downloaded_files = self._download_all_pdfs(all_pdf_links)
             return downloaded_files
 
         except Exception as e:
-            print(f"❌ Error during download: {type(e).__name__}: {e}")
-            import traceback
-
-            print(f"🔍 Traceback: {traceback.format_exc()}")
+            self.out.error(f"Error during download: {type(e).__name__}: {e}")
+            self.out.log("\U0001f50d", f"Traceback: {traceback.format_exc()}")
             return downloaded_files
         finally:
             self._cleanup_resources()
@@ -1013,7 +951,7 @@ class WellbinMedicalDownloader:
             True if login successful, False otherwise
         """
         if not self.login():
-            print("❌ Login failed, cannot proceed")
+            self.out.error("Login failed, cannot proceed")
             return False
         return True
 
@@ -1075,13 +1013,13 @@ class WellbinMedicalDownloader:
         """Clean up browser and session resources."""
         try:
             if self.driver:
-                print("🔒 Closing browser...")
+                self.out.log("\U0001f512", "Closing browser...")
                 self.driver.quit()
         except Exception as e:
-            print(f"⚠️  Error closing browser: {type(e).__name__}: {e}")
+            self.out.warning(f"Error closing browser: {type(e).__name__}: {e}")
 
         try:
             if self.session:
                 self.session.close()
         except Exception as e:
-            print(f"⚠️  Error closing session: {type(e).__name__}: {e}")
+            self.out.warning(f"Error closing session: {type(e).__name__}: {e}")

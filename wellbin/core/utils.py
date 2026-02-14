@@ -9,21 +9,6 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 
-def get_env_default(env_var: str, fallback: Any, convert_type: Optional[Callable[[str], Any]] = None) -> Any:
-    """Helper to get environment variable with proper empty value handling"""
-    value = os.getenv(env_var, "").strip()
-    if not value:
-        value = fallback
-
-    if convert_type is int:
-        return int(value)
-    elif convert_type is bool:
-        if isinstance(value, bool):
-            return value
-        return str(value).lower() in ("true", "1", "yes", "on")
-    return value
-
-
 def get_env_or_default(
     env_var: str,
     default_value: Any,
