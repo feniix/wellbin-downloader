@@ -62,13 +62,15 @@ def mock_study_links():
 @pytest.fixture
 def mock_study_info():
     """Sample study information for scraper tests."""
-    return {
-        "url": "https://wellbin-uploads.s3.amazonaws.com/test.pdf",
-        "text": "Test Lab Report",
-        "study_url": "https://wellbin.co/study/123?type=FhirStudy",
-        "study_type": "FhirStudy",
-        "study_date": "20240604",
-    }
+    from wellbin.core.scraper import PDFDownloadInfo
+
+    return PDFDownloadInfo(
+        url="https://wellbin-uploads.s3.amazonaws.com/test.pdf",
+        text="Test Lab Report",
+        study_url="https://wellbin.co/study/123?type=FhirStudy",
+        study_type="FhirStudy",
+        study_date="20240604",
+    )
 
 
 @pytest.fixture

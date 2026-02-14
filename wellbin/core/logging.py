@@ -10,7 +10,7 @@ import sys
 import traceback as tb_module
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class LogLevel(Enum):
@@ -54,7 +54,7 @@ class Output:
     Supports both console output and Python logging integration.
     """
 
-    def __init__(self, config: Optional[OutputConfig] = None):
+    def __init__(self, config: OutputConfig | None = None):
         """Initialize output handler.
 
         Args:
@@ -62,7 +62,7 @@ class Output:
         """
         self.config = config or OutputConfig()
         self._indent_level = 0
-        self._logger: Optional[logging.Logger] = None
+        self._logger: logging.Logger | None = None
 
     def configure_logging(self, name: str = "wellbin", level: int = logging.INFO) -> None:
         """Configure Python logging integration.
@@ -252,7 +252,7 @@ class Output:
         self.blank()
         self.action(title)
 
-    def item(self, text: str, index: Optional[int] = None, **kwargs: Any) -> None:
+    def item(self, text: str, index: int | None = None, **kwargs: Any) -> None:
         """Print list item.
 
         Args:
@@ -278,7 +278,7 @@ class Output:
 
 
 # Global output instance
-_output: Optional[Output] = None
+_output: Output | None = None
 
 
 def get_output() -> Output:
@@ -293,7 +293,7 @@ def get_output() -> Output:
     return _output
 
 
-def configure_output(config: Optional[OutputConfig] = None) -> Output:
+def configure_output(config: OutputConfig | None = None) -> Output:
     """Configure global output instance.
 
     Args:

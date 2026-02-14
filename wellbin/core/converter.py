@@ -9,11 +9,25 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, TypedDict, cast
 
 import pymupdf4llm
 
 from .logging import Output, get_output
+
+
+class PageChunk(TypedDict, total=False):
+    """Structure returned by pymupdf4llm.to_markdown(page_chunks=True).
+
+    Required keys are always present; optional keys depend on extraction settings.
+    """
+
+    text: str
+    tables: list[dict[str, Any]]
+    words: list[list[Any]]
+    metadata: dict[str, Any]
+    images: list[dict[str, Any]]
+    toc_items: list[Any]
 
 
 @dataclass
@@ -119,7 +133,7 @@ class PDFToMarkdownConverter:
         "CONCENTRACION",
     )
 
-    def medical_header_detector(self, span: dict[str, Any], page: Optional[Any] = None) -> str:
+    def medical_header_detector(self, span: dict[str, Any], page: Any | None = None) -> str:
         """Custom header detection optimized for medical documents.
 
         Recognizes common medical report sections and subsections.
@@ -167,31 +181,36 @@ class PDFToMarkdownConverter:
         """Check if text is a parameter header (ends with colon)."""
         return text.endswith(":") and size >= 9
 
-    def extract_enhanced_markdown(self, pdf_path: Path) -> Optional[Union[str, list[dict[str, Any]]]]:
+    def extract_enhanced_markdown(self, pdf_path: Path) -> str | list[PageChunk] | None:
         """Extract markdown with all advanced PyMuPDF4LLM features"""
         try:
             if self.enhanced_mode:
                 # Enhanced extraction with page chunks and rich metadata (no images)
-                chunks = pymupdf4llm.to_markdown(
-                    str(pdf_path),
-                    page_chunks=True,  # Rich page-by-page data
-                    extract_words=True,  # Word-level extraction
-                    ignore_images=True,  # Skip image processing entirely
-                    table_strategy="lines",  # Aggressive table detection
-                    hdr_info=self.medical_header_detector,  # Medical-specific headers
-                    margins=10,  # Small margins for full content
-                    show_progress=True,  # Show progress for large files
+                return cast(
+                    list[PageChunk],
+                    pymupdf4llm.to_markdown(
+                        str(pdf_path),
+                        page_chunks=True,  # Rich page-by-page data
+                        extract_words=True,  # Word-level extraction
+                        ignore_images=True,  # Skip image processing entirely
+                        table_strategy="lines",  # Aggressive table detection
+                        hdr_info=self.medical_header_detector,  # Medical-specific headers
+                        margins=10,  # Small margins for full content
+                        show_progress=True,  # Show progress for large files
+                    ),
                 )
-                return chunks
             else:
                 # Simple extraction (current behavior)
-                return pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector)
+                return cast(
+                    str,
+                    pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector),
+                )
 
         except Exception as e:
             self.out.error(f"Error extracting markdown from {pdf_path}: {e}")
             return None
 
-    def save_enhanced_chunks(self, chunks: Union[str, list[dict[str, Any]]], pdf_path: Path) -> list[Path]:
+    def save_enhanced_chunks(self, chunks: str | list[PageChunk], pdf_path: Path) -> list[Path]:
         """Save enhanced page chunks embedded in a single markdown file"""
         converted_files: list[Path] = []
         base_name = pdf_path.stem
@@ -312,7 +331,7 @@ Total words: {len(all_words)}
 
         return converted_files
 
-    def convert_pdf_to_markdown(self, pdf_path: Path) -> Optional[list[Path]]:
+    def convert_pdf_to_markdown(self, pdf_path: Path) -> list[Path] | None:
         """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features.
 
         Args:
@@ -351,7 +370,7 @@ Total words: {len(all_words)}
         total_size = sum(f.stat().st_size for f in converted_files)
         self.out.success(f"  Saved {len(converted_files)} files ({total_size:,} bytes)")
 
-    def _print_feature_stats(self, result: list[dict[str, Any]]) -> None:
+    def _print_feature_stats(self, result: list[PageChunk]) -> None:
         """Print statistics about extracted features."""
         stats = self._calculate_feature_stats(result)
 
@@ -362,7 +381,7 @@ Total words: {len(all_words)}
         if stats.words_extracted > 0:
             self.out.log("\U0001f4dd", f"  Extracted {stats.words_extracted} words with positions")
 
-    def _calculate_feature_stats(self, result: list[dict[str, Any]]) -> ConversionStats:
+    def _calculate_feature_stats(self, result: list[PageChunk]) -> ConversionStats:
         """Calculate statistics from conversion result.
 
         Args:
@@ -396,7 +415,7 @@ Total words: {len(all_words)}
 
         return result.successful_files
 
-    def _find_pdf_files(self) -> Optional[list[Path]]:
+    def _find_pdf_files(self) -> list[Path] | None:
         """Find all PDF files in the directory.
 
         Returns:

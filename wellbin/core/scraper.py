@@ -11,13 +11,13 @@ import time
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Optional
 
 import requests
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 
 from .logging import Output, get_output
@@ -54,8 +54,8 @@ class WellbinMedicalDownloader:
         email: str,
         password: str,
         headless: bool = True,
-        limit_studies: Optional[int] = None,
-        study_types: Optional[list[str]] = None,
+        limit_studies: int | None = None,
+        study_types: list[str] | None = None,
         output_dir: str = "downloads",
     ) -> None:
         self.email = email
@@ -64,8 +64,8 @@ class WellbinMedicalDownloader:
         self.login_url = "https://wellbin.co/login"
         self.explorer_url = "https://wellbin.co/explorer"
         self.session = requests.Session()
-        self.driver: Optional[webdriver.Chrome] = None
-        self.wait: Optional[WebDriverWait[webdriver.Chrome]] = None
+        self.driver: webdriver.Chrome | None = None
+        self.wait: WebDriverWait[webdriver.Chrome] | None = None
         self.headless = headless
         self.limit_studies = limit_studies  # None = all studies, number = limit to that many
         self.study_types = study_types or ["FhirStudy"]  # Default to FhirStudy only
@@ -259,7 +259,7 @@ class WellbinMedicalDownloader:
             self.out.log("\U0001f50d", f"Traceback: {traceback.format_exc()}")
             return False
 
-    def _extract_date_from_study_element(self, element: Any) -> None:
+    def _extract_date_from_study_element(self, element: WebElement) -> None:
         """Extract date from a single study element.
 
         Args:
@@ -285,7 +285,7 @@ class WellbinMedicalDownloader:
         except Exception as e:
             self.out.error(f"  Error extracting date for element: {type(e).__name__}: {e}")
 
-    def _get_study_container_text(self, element: Any, href: str) -> str:
+    def _get_study_container_text(self, element: WebElement, href: str) -> str:
         """Get container text for a study element.
 
         Args:
@@ -312,9 +312,9 @@ class WellbinMedicalDownloader:
     def parse_date_from_text(
         self,
         text: str,
-        date_patterns: Optional[list[str]] = None,
-        month_map: Optional[dict[str, str]] = None,
-    ) -> Optional[str]:
+        date_patterns: list[str] | None = None,
+        month_map: dict[str, str] | None = None,
+    ) -> str | None:
         """Parse date from text using various patterns.
 
         Args:
@@ -342,7 +342,7 @@ class WellbinMedicalDownloader:
         pattern: str,
         patterns: list[str],
         month_map: dict[str, str],
-    ) -> Optional[str]:
+    ) -> str | None:
         """Try to parse a single regex match into a date.
 
         Args:
@@ -370,7 +370,7 @@ class WellbinMedicalDownloader:
             pass
         return None
 
-    def _parse_ambiguous_date(self, match: tuple[str, ...]) -> Optional[str]:
+    def _parse_ambiguous_date(self, match: tuple[str, ...]) -> str | None:
         """Parse ambiguous DD/MM vs MM/DD format."""
         part1, part2, year = match
         part1_int, part2_int, year_int = int(part1), int(part2), int(year)
@@ -387,7 +387,7 @@ class WellbinMedicalDownloader:
             return f"{year_int}{month:02d}{day:02d}"
         return None
 
-    def _parse_iso_date(self, match: tuple[str, ...]) -> Optional[str]:
+    def _parse_iso_date(self, match: tuple[str, ...]) -> str | None:
         """Parse YYYY/MM/DD format."""
         year_str, month_str, day_str = match
         year_int, month_int, day_int = int(year_str), int(month_str), int(day_str)
@@ -395,7 +395,7 @@ class WellbinMedicalDownloader:
             return f"{year_int}{month_int:02d}{day_int:02d}"
         return None
 
-    def _parse_day_month_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> Optional[str]:
+    def _parse_day_month_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> str | None:
         """Parse DD Mon YYYY format."""
         day_str, month_name, year_str = match
         day_int, year_int = int(day_str), int(year_str)
@@ -404,7 +404,7 @@ class WellbinMedicalDownloader:
             return f"{year_int}{month_int:02d}{day_int:02d}"
         return None
 
-    def _parse_month_day_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> Optional[str]:
+    def _parse_month_day_year_date(self, match: tuple[str, ...], month_map: dict[str, str]) -> str | None:
         """Parse Mon DD, YYYY format."""
         month_name, day_str, year_str = match
         day_int, year_int = int(day_str), int(year_str)
@@ -413,7 +413,7 @@ class WellbinMedicalDownloader:
             return f"{year_int}{month_int:02d}{day_int:02d}"
         return None
 
-    def extract_date_from_study_id(self, study_id: str) -> Optional[str]:
+    def extract_date_from_study_id(self, study_id: str) -> str | None:
         """Extract date from study ID if it contains timestamp patterns"""
         # Look for timestamp patterns in study ID
         timestamp_patterns = [
@@ -479,7 +479,7 @@ class WellbinMedicalDownloader:
             self.out.error(f"  Error extracting date for {href}: {e}")
             return self.DEFAULT_DATE
 
-    def _extract_container_text(self, element: Any, href_xpath: str) -> str:
+    def _extract_container_text(self, element: WebElement, href_xpath: str) -> str:
         """Extract all relevant text from an element's container.
 
         Args:
@@ -503,7 +503,7 @@ class WellbinMedicalDownloader:
             self.out.warning(f"    Could not extract container text: {type(e).__name__}")
             return element.text if element else ""
 
-    def _collect_date_like_text(self, parent: Any) -> str:
+    def _collect_date_like_text(self, parent: WebElement) -> str:
         """Collect text from child elements that look like dates.
 
         Args:
@@ -661,7 +661,7 @@ class WellbinMedicalDownloader:
         self.out.progress(f"Found {len(study_links)} matching study links")
         return study_links
 
-    def _extract_valid_study_link(self, link: Any) -> Optional[str]:
+    def _extract_valid_study_link(self, link: WebElement) -> str | None:
         """Extract href from a link element if it's a valid study link."""
         try:
             href = link.get_attribute("href")
@@ -678,7 +678,7 @@ class WellbinMedicalDownloader:
             return study_links[: self.limit_studies]
         return study_links
 
-    def get_pdf_from_study(self, study_url: str, study_index: int = 1, total_studies: int = 1) -> list[dict[str, Any]]:
+    def get_pdf_from_study(self, study_url: str, study_index: int = 1, total_studies: int = 1) -> list[PDFDownloadInfo]:
         """Get PDF download links from a study page.
 
         Args:
@@ -687,7 +687,7 @@ class WellbinMedicalDownloader:
             total_studies: Total number of studies (for progress display)
 
         Returns:
-            List of PDF download info dictionaries
+            List of PDFDownloadInfo objects
         """
         try:
             study_type = self._extract_study_type(study_url)
@@ -751,7 +751,7 @@ class WellbinMedicalDownloader:
         self.out.log("\U0001f4c5", f"  Study date: {study_date}")
         return study_date
 
-    def _find_pdf_download_links(self, study_url: str, study_type: str, study_date: str) -> list[dict[str, Any]]:
+    def _find_pdf_download_links(self, study_url: str, study_type: str, study_date: str) -> list[PDFDownloadInfo]:
         """Find PDF download links on study page.
 
         Args:
@@ -760,7 +760,7 @@ class WellbinMedicalDownloader:
             study_date: Study date string
 
         Returns:
-            List of PDF download info dictionaries
+            List of PDFDownloadInfo objects
         """
         self.out.debug("  Looking for 'Descargar estudio' button...")
 
@@ -778,7 +778,7 @@ class WellbinMedicalDownloader:
             self.out.error(f"  Error finding download link: {e}")
             return []
 
-    def _find_s3_download_elements(self) -> list[Any]:
+    def _find_s3_download_elements(self) -> list[WebElement]:
         """Find S3 download link elements on page.
 
         Returns:
@@ -795,8 +795,8 @@ class WellbinMedicalDownloader:
         return elements
 
     def _process_download_element(
-        self, element: Any, study_url: str, study_type: str, study_date: str
-    ) -> list[dict[str, Any]]:
+        self, element: WebElement, study_url: str, study_type: str, study_date: str
+    ) -> list[PDFDownloadInfo]:
         """Process a download element and return PDF info.
 
         Args:
@@ -806,21 +806,21 @@ class WellbinMedicalDownloader:
             study_date: Study date string
 
         Returns:
-            List containing single PDF info dictionary
+            List containing single PDFDownloadInfo
         """
-        href = element.get_attribute("href")
+        href = element.get_attribute("href") or ""
         text = element.text.strip() or "Download"
 
-        self.out.success(f"  Found download link: {href and href[:100]}...")
+        self.out.success(f"  Found download link: {href[:100]}...")
 
         return [
-            {
-                "url": href,
-                "text": text,
-                "study_url": study_url,
-                "study_type": study_type,
-                "study_date": study_date,
-            }
+            PDFDownloadInfo(
+                url=href,
+                text=text,
+                study_url=study_url,
+                study_type=study_type,
+                study_date=study_date,
+            )
         ]
 
     def _print_available_links(self) -> None:
@@ -855,24 +855,23 @@ class WellbinMedicalDownloader:
 
     def download_pdf(
         self,
-        pdf_info: dict[str, Any],
+        pdf_info: PDFDownloadInfo,
         download_index: int = 1,
         total_downloads: int = 1,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Download a PDF file"""
         try:
-            study_date = pdf_info["study_date"]
             self.out.blank()
-            desc = f"Downloading {pdf_info['study_type']} PDF ({study_date}):"
+            desc = f"Downloading {pdf_info.study_type} PDF ({pdf_info.study_date}):"
             self.out.step(download_index, total_downloads, "\U0001f4e5", desc)
-            self.out.log("\U0001f4dd", f"  Description: {pdf_info['text']}")
-            self.out.log("\U0001f517", f"  URL: {pdf_info['url'][:100]}...")
+            self.out.log("\U0001f4dd", f"  Description: {pdf_info.text}")
+            self.out.log("\U0001f517", f"  URL: {pdf_info.url[:100]}...")
 
             # S3 URLs are pre-signed, no authentication needed
             headers = {"User-Agent": self.USER_AGENT}
 
             self.out.log("\U0001f310", "  Making download request...")
-            response = self.session.get(pdf_info["url"], headers=headers, stream=True)
+            response = self.session.get(pdf_info.url, headers=headers, stream=True)
             self.out.progress(f"  Response status: {response.status_code}")
 
             if response.status_code != 200:
@@ -882,11 +881,11 @@ class WellbinMedicalDownloader:
             response.raise_for_status()
 
             # Generate filename based on study date and type
-            filename = self.generate_filename(study_date, pdf_info["study_type"])
+            filename = self.generate_filename(pdf_info.study_date, pdf_info.study_type)
             self.out.log("\U0001f4c1", f"  Generated filename: {filename}")
 
             # Create output directories
-            config = self.study_config.get(pdf_info["study_type"], {"subdir": "unknown"})
+            config = self.study_config.get(pdf_info.study_type, {"subdir": "unknown"})
             output_subdir = os.path.join(self.output_dir, config["subdir"])
             os.makedirs(output_subdir, exist_ok=True)
             filepath = os.path.join(output_subdir, filename)
@@ -909,9 +908,9 @@ class WellbinMedicalDownloader:
             self.out.log("\U0001f50d", f"  Traceback: {traceback.format_exc()}")
             return None
 
-    def scrape_studies(self) -> list[dict[str, Any]]:
+    def scrape_studies(self) -> list[DownloadResult]:
         """Main method to download studies and download PDFs."""
-        downloaded_files: list[dict[str, Any]] = []
+        downloaded_files: list[DownloadResult] = []
 
         try:
             if not self._ensure_login():
@@ -970,28 +969,28 @@ class WellbinMedicalDownloader:
         for i, study_url in enumerate(study_links, 1):
             pdf_links = self.get_pdf_from_study(study_url, i, total_studies)
             for pdf in pdf_links:
-                pdf["study_index"] = i
-                all_pdf_links.append(PDFDownloadInfo(**pdf))
+                pdf.study_index = i
+                all_pdf_links.append(pdf)
 
             if i < total_studies:
                 time.sleep(0.5)
 
         return all_pdf_links
 
-    def _download_all_pdfs(self, pdf_links: list[PDFDownloadInfo]) -> list[dict[str, Any]]:
+    def _download_all_pdfs(self, pdf_links: list[PDFDownloadInfo]) -> list[DownloadResult]:
         """Download all PDFs and return results.
 
         Args:
             pdf_links: List of PDF download information
 
         Returns:
-            List of download result dictionaries
+            List of DownloadResult objects
         """
-        downloaded_files: list[dict[str, Any]] = []
+        downloaded_files: list[DownloadResult] = []
         total_pdfs = len(pdf_links)
 
         for i, pdf_info in enumerate(pdf_links, 1):
-            filepath = self.download_pdf(pdf_info.__dict__, i, total_pdfs)
+            filepath = self.download_pdf(pdf_info, i, total_pdfs)
             if filepath:
                 result = DownloadResult(
                     local_path=filepath,
@@ -1002,7 +1001,7 @@ class WellbinMedicalDownloader:
                     description=pdf_info.text,
                     study_index=pdf_info.study_index,
                 )
-                downloaded_files.append(result.__dict__)
+                downloaded_files.append(result)
 
             if i < total_pdfs:
                 time.sleep(0.2)

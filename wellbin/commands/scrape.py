@@ -3,12 +3,11 @@ Scrape command for downloading medical data from Wellbin platform.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
 
 import click
 from dotenv import load_dotenv
 
-from ..core.scraper import WellbinMedicalDownloader
+from ..core.scraper import DownloadResult, WellbinMedicalDownloader
 from ..core.utils import get_env_or_default, validate_credentials
 
 # Load environment variables
@@ -21,7 +20,7 @@ class ScrapeConfig:
 
     email: str = ""
     password: str = ""
-    limit: Optional[int] = None
+    limit: int | None = None
     study_types: list[str] = field(default_factory=lambda: ["FhirStudy"])
     output_dir: str = "medical_data"
     headless: bool = True
@@ -36,12 +35,12 @@ class ScrapeConfig:
 
 
 def resolve_config(
-    email: Optional[str],
-    password: Optional[str],
-    limit: Optional[int],
-    types: Optional[str],
-    output: Optional[str],
-    headless: Optional[bool],
+    email: str | None,
+    password: str | None,
+    limit: int | None,
+    types: str | None,
+    output: str | None,
+    headless: bool | None,
 ) -> ScrapeConfig:
     """Resolve configuration from CLI args and environment variables.
 
@@ -148,14 +147,14 @@ def display_config(config: ScrapeConfig, dry_run: bool) -> None:
 
 
 def display_summary(
-    downloaded_files: list[dict[str, Any]],
+    downloaded_files: list[DownloadResult],
     downloader: WellbinMedicalDownloader,
     output_dir: str,
 ) -> None:
     """Display download summary.
 
     Args:
-        downloaded_files: List of downloaded file info
+        downloaded_files: List of download results
         downloader: Downloader instance with study config
         output_dir: Output directory path
     """
@@ -178,11 +177,11 @@ def display_summary(
     _display_next_steps(output_dir)
 
 
-def _group_files_by_type(files: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _group_files_by_type(files: list[DownloadResult]) -> dict[str, list[DownloadResult]]:
     """Group downloaded files by study type."""
-    by_type: dict[str, list[dict[str, Any]]] = {}
+    by_type: dict[str, list[DownloadResult]] = {}
     for file_info in files:
-        study_type = file_info["study_type"]
+        study_type = file_info.study_type
         if study_type not in by_type:
             by_type[study_type] = []
         by_type[study_type].append(file_info)
@@ -191,7 +190,7 @@ def _group_files_by_type(files: list[dict[str, Any]]) -> dict[str, list[dict[str
 
 def _display_type_summary(
     study_type: str,
-    files: list[dict[str, Any]],
+    files: list[DownloadResult],
     downloader: WellbinMedicalDownloader,
 ) -> None:
     """Display summary for a single study type."""
@@ -199,13 +198,13 @@ def _display_type_summary(
     click.echo(f"\n{config['icon']} {config['description']} ({len(files)} files):")
 
     for i, file_info in enumerate(files, 1):
-        click.echo(f"  {i}. 📄 {file_info['local_path']}")
-        click.echo(f"     📅 Study date: {file_info['study_date']}")
-        click.echo(f"     📝 Description: {file_info['description']}")
+        click.echo(f"  {i}. 📄 {file_info.local_path}")
+        click.echo(f"     📅 Study date: {file_info.study_date}")
+        click.echo(f"     📝 Description: {file_info.description}")
 
 
 def _display_directory_structure(
-    by_type: dict[str, list[dict[str, Any]]],
+    by_type: dict[str, list[DownloadResult]],
     downloader: WellbinMedicalDownloader,
     output_dir: str,
 ) -> None:
@@ -259,12 +258,12 @@ def _display_next_steps(output_dir: str) -> None:
     help="Show what would be downloaded without actually downloading",
 )
 def scrape(
-    email: Optional[str],
-    password: Optional[str],
-    limit: Optional[int],
-    types: Optional[str],
-    output: Optional[str],
-    headless: Optional[bool],
+    email: str | None,
+    password: str | None,
+    limit: int | None,
+    types: str | None,
+    output: str | None,
+    headless: bool | None,
     dry_run: bool,
 ) -> None:
     """

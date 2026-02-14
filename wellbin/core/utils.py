@@ -5,14 +5,15 @@ Contains common helper functions used across the package.
 """
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 def get_env_or_default(
     env_var: str,
     default_value: Any,
-    convert_type: Optional[Callable[[str], Any]] = None,
+    convert_type: Callable[[str], Any] | None = None,
 ) -> Any:
     """
     Get value from environment variable with proper fallback handling.

@@ -9,7 +9,7 @@ import pytest
 import requests
 from selenium.common.exceptions import NoSuchElementException
 
-from wellbin.core.scraper import WellbinMedicalDownloader
+from wellbin.core.scraper import PDFDownloadInfo, WellbinMedicalDownloader
 
 
 class TestWellbinMedicalDownloader:
@@ -237,13 +237,13 @@ class TestWellbinMedicalDownloader:
         mock_get_links.return_value = mock_study_links
 
         # Mock PDF info
-        mock_pdf_info = {
-            "url": "https://test.com/test.pdf",
-            "text": "Test PDF",
-            "study_url": "https://wellbin.co/study/123",
-            "study_type": "FhirStudy",
-            "study_date": "20240604",
-        }
+        mock_pdf_info = PDFDownloadInfo(
+            url="https://test.com/test.pdf",
+            text="Test PDF",
+            study_url="https://wellbin.co/study/123",
+            study_type="FhirStudy",
+            study_date="20240604",
+        )
         mock_get_pdf.return_value = [mock_pdf_info]
 
         # Mock successful download

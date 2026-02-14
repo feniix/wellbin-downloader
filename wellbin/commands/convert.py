@@ -4,7 +4,6 @@ Convert command for converting PDFs to markdown format.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import click
 from dotenv import load_dotenv
@@ -35,10 +34,10 @@ class ConvertConfig:
 
 
 def resolve_config(
-    input_dir: Optional[str],
-    output_dir: Optional[str],
+    input_dir: str | None,
+    output_dir: str | None,
     preserve_structure: bool,
-    file_type: Optional[str],
+    file_type: str | None,
     enhanced_mode: bool,
 ) -> ConvertConfig:
     """Resolve configuration from CLI args and environment variables.
@@ -206,10 +205,10 @@ def display_failure_info() -> None:
     help="Enable enhanced mode with page chunks, tables, and word positions (overrides WELLBIN_ENHANCED_MODE env var)",
 )
 def convert(
-    input_dir: Optional[str],
-    output_dir: Optional[str],
+    input_dir: str | None,
+    output_dir: str | None,
     preserve_structure: bool,
-    file_type: Optional[str],
+    file_type: str | None,
     enhanced_mode: bool,
 ) -> None:
     """

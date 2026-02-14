@@ -3,7 +3,7 @@ name = "wellbin-downloader"
 version = "0.1.0"
 description = "A comprehensive tool for downloading and processing medical data from the Wellbin platform"
 authors = [{name = "feniix", email = "feniix@gmail.com"}]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.0",
@@ -23,10 +23,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -59,7 +57,7 @@ dev-dependencies = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
@@ -113,7 +111,7 @@ exclude = [
 ]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.9"
+pythonVersion = "3.12"
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportMissingImports = true
