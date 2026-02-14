@@ -5,6 +5,8 @@ This module provides a structured exception system for better error handling,
 debugging, and user feedback throughout the application.
 """
 
+from pathlib import Path
+
 
 class WellbinError(Exception):
     """Base exception for all Wellbin-related errors."""
@@ -144,6 +146,53 @@ class DateExtractionError(DataProcessingError):
 
 class PDFProcessingError(DataProcessingError):
     """Raised when PDF processing or conversion fails."""
+
+    def __init__(
+        self,
+        message: str,
+        file_path: Path | None = None,
+        details: str | None = None,
+    ) -> None:
+        self.file_path = file_path
+        super().__init__(message, details)
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.file_path:
+            return f"{base} (File: {self.file_path})"
+        return base
+
+
+class PDFCorruptedError(PDFProcessingError):
+    """Raised when a PDF file is corrupted or malformed."""
+
+    pass
+
+
+class PDFTooLargeError(PDFProcessingError):
+    """Raised when a PDF exceeds size limits for processing."""
+
+    def __init__(
+        self,
+        message: str,
+        file_path: Path | None = None,
+        size_mb: float | None = None,
+        max_size_mb: float | None = None,
+        details: str | None = None,
+    ) -> None:
+        self.size_mb = size_mb
+        self.max_size_mb = max_size_mb
+        super().__init__(message, file_path, details)
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.size_mb and self.max_size_mb:
+            return f"{base} (Size: {self.size_mb:.1f}MB, Max: {self.max_size_mb:.1f}MB)"
+        return base
+
+
+class PDFExtractionError(PDFProcessingError):
+    """Raised when text extraction from PDF fails."""
 
     pass
 

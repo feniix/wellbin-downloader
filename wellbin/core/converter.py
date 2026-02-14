@@ -13,7 +13,29 @@ from typing import Any, TypedDict, cast
 
 import pymupdf4llm
 
+from .exceptions import (
+    FileWriteError,
+    InvalidConfigurationError,
+    PDFProcessingError,
+)
 from .logging import Output, get_output
+
+# ============================================================================
+# Configuration Constants
+# ============================================================================
+
+# Memory management thresholds
+MAX_PDF_SIZE_MB = 100  # Warn for PDFs larger than 100MB
+MAX_PAGES_ENHANCED_MODE = 50  # Limit for enhanced mode to prevent memory issues
+
+# Header detection font size thresholds (in points)
+MAIN_SECTION_MIN_SIZE = 12.0
+SUBSECTION_MIN_SIZE = 10.0
+PARAMETER_MIN_SIZE = 9.0
+
+# Processing options
+DEFAULT_TABLE_STRATEGY = "lines"
+DEFAULT_MARGINS = 10
 
 
 class PageChunk(TypedDict, total=False):
@@ -54,11 +76,19 @@ class ConversionResult:
 
 
 class PDFToMarkdownConverter:
+    """PDF to Markdown converter with medical document optimization.
+
+    Supports both standard and enhanced extraction modes with memory management
+    safeguards for large documents.
+    """
+
     def __init__(
         self,
         pdf_dir: str = "medical_data",
         output_dir: str = "markdown_reports",
         enhanced_mode: bool = False,
+        max_pdf_size_mb: float = MAX_PDF_SIZE_MB,
+        max_pages_enhanced: int = MAX_PAGES_ENHANCED_MODE,
     ) -> None:
         """
         Initialize PDF to Markdown converter with enhanced PyMuPDF4LLM features
@@ -67,14 +97,21 @@ class PDFToMarkdownConverter:
             pdf_dir: Directory containing PDF files
             output_dir: Directory to save markdown files
             enhanced_mode: Enable advanced features (page chunks, word positions, etc.)
+            max_pdf_size_mb: Maximum PDF size before warning (MB)
+            max_pages_enhanced: Maximum pages for enhanced mode before warning
+
+        Raises:
+            InvalidConfigurationError: If directories cannot be created or accessed
         """
         self.pdf_dir = Path(pdf_dir)
         self.output_dir = Path(output_dir)
         self.enhanced_mode = enhanced_mode
+        self.max_pdf_size_mb = max_pdf_size_mb
+        self.max_pages_enhanced = max_pages_enhanced
         self.out: Output = get_output()
 
-        # Create output directory
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Validate and create output directory
+        self._validate_and_create_output_dir()
 
     # Class constants for medical header detection
     MAIN_SECTIONS: tuple[str, ...] = (
@@ -168,73 +205,223 @@ class PDFToMarkdownConverter:
         """Check if text is a main medical section header."""
         if not any(section in text_upper for section in self.MAIN_SECTIONS):
             return False
-        return size >= 12 or "bold" in font
+        return size >= MAIN_SECTION_MIN_SIZE or "bold" in font
 
     def _is_subsection(self, text_upper: str, size: float) -> bool:
         """Check if text is a subsection header."""
         if not any(section in text_upper for section in self.SUBSECTIONS):
             return False
-        return size >= 10
+        return size >= SUBSECTION_MIN_SIZE
 
     @staticmethod
     def _is_parameter_header(text: str, size: float) -> bool:
         """Check if text is a parameter header (ends with colon)."""
-        return text.endswith(":") and size >= 9
+        return text.endswith(":") and size >= PARAMETER_MIN_SIZE
+
+    def _validate_and_create_output_dir(self) -> None:
+        """Validate and create output directory with proper error handling.
+
+        Raises:
+            InvalidConfigurationError: If directory cannot be created or is not writable
+        """
+        try:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Verify directory is writable by attempting to create a test file
+            test_file = self.output_dir / ".write_test"
+            try:
+                test_file.touch()
+                test_file.unlink()
+            except PermissionError as e:
+                raise InvalidConfigurationError(
+                    f"Output directory is not writable: {self.output_dir}",
+                    details="Check directory permissions",
+                ) from e
+
+        except OSError as e:
+            raise InvalidConfigurationError(
+                f"Failed to create output directory: {self.output_dir}",
+                details=str(e),
+            ) from e
 
     def extract_enhanced_markdown(self, pdf_path: Path) -> str | list[PageChunk] | None:
-        """Extract markdown with all advanced PyMuPDF4LLM features"""
+        """Extract markdown with all advanced PyMuPDF4LLM features.
+
+        Includes memory management safeguards for large PDFs.
+
+        Args:
+            pdf_path: Path to the PDF file to convert
+
+        Returns:
+            Markdown string (standard mode) or list of PageChunk dicts (enhanced mode),
+            or None if extraction fails
+
+        Raises:
+            PDFProcessingError: If PDF file is corrupted or cannot be read
+        """
+        self._check_pdf_size(pdf_path)
+
         try:
             if self.enhanced_mode:
-                # Enhanced extraction with page chunks and rich metadata (no images)
-                return cast(
-                    list[PageChunk],
-                    pymupdf4llm.to_markdown(
-                        str(pdf_path),
-                        page_chunks=True,  # Rich page-by-page data
-                        extract_words=True,  # Word-level extraction
-                        ignore_images=True,  # Skip image processing entirely
-                        table_strategy="lines",  # Aggressive table detection
-                        hdr_info=self.medical_header_detector,  # Medical-specific headers
-                        margins=10,  # Small margins for full content
-                        show_progress=True,  # Show progress for large files
-                    ),
-                )
+                return self._extract_enhanced_mode(pdf_path)
             else:
-                # Simple extraction (current behavior)
-                return cast(
-                    str,
-                    pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector),
-                )
+                return self._extract_standard_mode(pdf_path)
 
         except Exception as e:
             self.out.error(f"Error extracting markdown from {pdf_path}: {e}")
             return None
 
+    def _check_pdf_size(self, pdf_path: Path) -> None:
+        """Check PDF file size and warn if it exceeds thresholds.
+
+        Args:
+            pdf_path: Path to the PDF file to check
+        """
+        try:
+            file_size_mb = pdf_path.stat().st_size / (1024 * 1024)
+            if file_size_mb > self.max_pdf_size_mb:
+                self.out.warning(
+                    f"Large PDF detected ({file_size_mb:.1f}MB). Consider using standard mode for better memory usage."
+                )
+        except OSError:
+            pass  # File doesn't exist or is inaccessible, let extraction fail naturally
+
+    def _extract_enhanced_mode(self, pdf_path: Path) -> list[PageChunk]:
+        """Extract PDF in enhanced mode with page chunks and rich metadata.
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            List of PageChunk dictionaries with page-by-page data
+        """
+        return cast(
+            list[PageChunk],
+            pymupdf4llm.to_markdown(
+                str(pdf_path),
+                page_chunks=True,  # Rich page-by-page data
+                extract_words=True,  # Word-level extraction
+                ignore_images=True,  # Skip image processing entirely
+                table_strategy=DEFAULT_TABLE_STRATEGY,
+                hdr_info=self.medical_header_detector,
+                margins=DEFAULT_MARGINS,
+                show_progress=True,
+            ),
+        )
+
+    def _extract_standard_mode(self, pdf_path: Path) -> str:
+        """Extract PDF in standard mode (simple markdown).
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            Markdown string with document content
+        """
+        return cast(
+            str,
+            pymupdf4llm.to_markdown(str(pdf_path), hdr_info=self.medical_header_detector),
+        )
+
     def save_enhanced_chunks(self, chunks: str | list[PageChunk], pdf_path: Path) -> list[Path]:
-        """Save enhanced page chunks embedded in a single markdown file"""
-        converted_files: list[Path] = []
+        """Save enhanced page chunks embedded in a single markdown file.
+
+        Args:
+            chunks: Either markdown string (standard) or list of PageChunk dicts (enhanced)
+            pdf_path: Original PDF path for naming
+
+        Returns:
+            List of created file paths
+        """
         base_name = pdf_path.stem
+        output_path = self.output_dir / f"{base_name}.md"
 
         if isinstance(chunks, list):
-            # Enhanced mode: embed all page chunks in one file
-            output_filename = f"{base_name}.md"
-            output_path = self.output_dir / output_filename
+            content = self._build_enhanced_document(chunks, base_name)
+        else:
+            content = self._build_standard_document(chunks, base_name)
 
-            # Build the complete document with embedded chunks
-            content_parts: list[str] = []
-            all_words: list[Any] = []
+        self._write_markdown_file(output_path, content)
+        return [output_path]
 
-            # Document header with overall metadata
-            total_pages = len(chunks)
-            total_tables = sum(len(chunk.get("tables", [])) for chunk in chunks)
+    def _build_enhanced_document(self, chunks: list[PageChunk], base_name: str) -> str:
+        """Build complete enhanced markdown document from page chunks.
 
-            # Collect all words for the footer
-            for chunk in chunks:
-                if "words" in chunk:
-                    all_words.extend(chunk["words"])
+        Args:
+            chunks: List of PageChunk dictionaries
+            base_name: Base filename for the document
 
-            # Main document header
-            header = f"""# Medical Report: {base_name}
+        Returns:
+            Complete markdown document string
+        """
+        # Collect metadata and word data
+        all_words = self._collect_all_words(chunks)
+        total_tables = sum(len(chunk.get("tables", [])) for chunk in chunks)
+
+        # Build document header
+        header = self._build_enhanced_header(base_name, len(chunks), total_tables, len(all_words))
+
+        # Build page sections
+        page_sections = self._build_page_sections(chunks, len(chunks))
+
+        # Combine content
+        full_content = header + "\n\n---\n\n".join(page_sections)
+
+        # Add word position footer if available
+        if all_words:
+            full_content += self._build_word_footer(all_words)
+
+        return full_content
+
+    def _build_standard_document(self, markdown: str, base_name: str) -> str:
+        """Build standard markdown document with header.
+
+        Args:
+            markdown: Raw markdown content
+            base_name: Base filename for the document
+
+        Returns:
+            Complete markdown document string
+        """
+        header = f"""# Medical Report: {base_name}
+
+**Source File:** `{base_name}.pdf`
+**Extracted:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+**Processor:** PyMuPDF4LLM Standard Mode
+
+---
+
+"""
+        return header + markdown
+
+    def _collect_all_words(self, chunks: list[PageChunk]) -> list[Any]:
+        """Collect all word data from page chunks.
+
+        Args:
+            chunks: List of PageChunk dictionaries
+
+        Returns:
+            Combined list of all word data
+        """
+        all_words: list[Any] = []
+        for chunk in chunks:
+            if "words" in chunk:
+                all_words.extend(chunk["words"])
+        return all_words
+
+    def _build_enhanced_header(self, base_name: str, total_pages: int, total_tables: int, word_count: int) -> str:
+        """Build enhanced document header with metadata.
+
+        Args:
+            base_name: Base filename
+            total_pages: Number of pages in document
+            total_tables: Number of tables found
+            word_count: Total words extracted
+
+        Returns:
+            Header markdown string
+        """
+        return f"""# Medical Report: {base_name}
 
 **Source File:** `{base_name}.pdf`
 **Extracted:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -242,40 +429,50 @@ class PDFToMarkdownConverter:
 **Optimized:** LLM medical data consumption
 **Total Pages:** {total_pages}
 **Tables Found:** {total_tables} tables detected
-**Words Extracted:** {len(all_words)} words with positions
+**Words Extracted:** {word_count} words with positions
 
 ---
 
 """
 
-            # Add each page as a section
-            for i, chunk in enumerate(chunks):
-                page_num = i + 1
-                page_tables = chunk.get("tables", [])
-                page_words = chunk.get("words", [])
+    def _build_page_sections(self, chunks: list[PageChunk], total_pages: int) -> list[str]:
+        """Build individual page section content.
 
-                # Page section header
-                page_header = f"""
-## \U0001f4c4 Page {page_num}
+        Args:
+            chunks: List of PageChunk dictionaries
+            total_pages: Total number of pages
+
+        Returns:
+            List of page section markdown strings
+        """
+        sections: list[str] = []
+        for i, chunk in enumerate(chunks):
+            page_num = i + 1
+            page_tables = chunk.get("tables", [])
+            page_words = chunk.get("words", [])
+
+            page_header = f"""
+## 📄 Page {page_num}
 
 **Page Number:** {page_num} of {total_pages}
 **Tables on Page:** {len(page_tables)}
 **Words on Page:** {len(page_words)}
 
 """
+            sections.append(page_header + chunk["text"])
 
-                # Page content
-                page_content = chunk["text"]
+        return sections
 
-                # Combine page section
-                content_parts.append(page_header + page_content)
+    def _build_word_footer(self, all_words: list[Any]) -> str:
+        """Build hidden footer with word position data.
 
-            # Combine all content
-            full_content = header + "\n\n---\n\n".join(content_parts)
+        Args:
+            all_words: List of word position data
 
-            # Add hidden footer with word data
-            if all_words:
-                footer = f"""
+        Returns:
+            Footer markdown string
+        """
+        return f"""
 
 <!--
 ========================================
@@ -288,7 +485,7 @@ Total words: {len(all_words)}
 -->
 
 <details>
-<summary>\U0001f4ca Word Position Data (Click to expand)</summary>
+<summary>📊 Word Position Data (Click to expand)</summary>
 
 ```json
 {json.dumps(all_words, indent=2)}
@@ -298,38 +495,30 @@ Total words: {len(all_words)}
 
 <!-- End of word position data -->
 """
-                full_content += footer
 
-            # Save the complete document
+    def _write_markdown_file(self, output_path: Path, content: str) -> None:
+        """Write markdown content to file with error handling.
+
+        Args:
+            output_path: Path to write the file
+            content: Markdown content to write
+
+        Raises:
+            FileWriteError: If file cannot be written
+        """
+        try:
             with open(output_path, "w", encoding="utf-8") as f:
-                f.write(full_content)
-
-            converted_files.append(output_path)
-
-        else:
-            # Simple mode: single markdown file
-            output_filename = base_name + ".md"
-            output_path = self.output_dir / output_filename
-
-            # Add simple header for non-enhanced mode
-            header = f"""# Medical Report: {base_name}
-
-**Source File:** `{base_name}.pdf`
-**Extracted:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-**Processor:** PyMuPDF4LLM Standard Mode
-
----
-
-"""
-
-            final_markdown = header + chunks
-
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(final_markdown)
-
-            converted_files.append(output_path)
-
-        return converted_files
+                f.write(content)
+        except PermissionError as e:
+            raise FileWriteError(
+                f"Permission denied writing to {output_path}",
+                details="Check file permissions",
+            ) from e
+        except OSError as e:
+            raise FileWriteError(
+                f"Failed to write file {output_path}",
+                details=str(e),
+            ) from e
 
     def convert_pdf_to_markdown(self, pdf_path: Path) -> list[Path] | None:
         """Convert a single PDF to markdown using enhanced PyMuPDF4LLM features.
@@ -339,6 +528,10 @@ Total words: {len(all_words)}
 
         Returns:
             List of created file paths, or None on failure
+
+        Note:
+            Custom exceptions (PDFProcessingError, FileWriteError) are caught and
+            logged, returning None to allow batch processing to continue.
         """
         try:
             self._print_conversion_start(pdf_path)
@@ -355,8 +548,18 @@ Total words: {len(all_words)}
 
             return converted_files
 
+        except PDFProcessingError as e:
+            self.out.error(f"  PDF processing error for {pdf_path.name}: {e.message}")
+            if e.details:
+                self.out.log("", f"    Details: {e.details}")
+            return None
+        except FileWriteError as e:
+            self.out.error(f"  File write error for {pdf_path.name}: {e.message}")
+            if e.details:
+                self.out.log("", f"    Details: {e.details}")
+            return None
         except Exception as e:
-            self.out.error(f"  Error converting {pdf_path.name}: {e}")
+            self.out.error(f"  Unexpected error converting {pdf_path.name}: {e}")
             return None
 
     def _print_conversion_start(self, pdf_path: Path) -> None:
@@ -411,7 +614,7 @@ Total words: {len(all_words)}
         self._print_batch_start(pdf_files)
 
         result = self._process_all_pdfs(pdf_files)
-        self._print_batch_summary(result, pdf_files)
+        self._print_batch_summary(result)
 
         return result.successful_files
 
@@ -465,12 +668,11 @@ Total words: {len(all_words)}
         result.total_bytes = sum(f.stat().st_size for f in successful_files) if successful_files else 0
         return result
 
-    def _print_batch_summary(self, result: ConversionResult, pdf_files: list[Path]) -> None:
+    def _print_batch_summary(self, result: ConversionResult) -> None:
         """Print batch conversion summary.
 
         Args:
             result: Conversion statistics
-            pdf_files: Original list of PDF files
         """
         self.out.header("\U0001f389 CONVERSION COMPLETE!")
         self.out.success(f"Successfully converted: {result.successful} PDFs")
