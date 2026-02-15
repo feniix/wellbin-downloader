@@ -41,6 +41,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0  # Full history for changelog generation
 
       - uses: astral-sh/setup-uv@v7.3.0
         with:
@@ -58,12 +60,37 @@ jobs:
           echo "Built artifacts:"
           ls -la dist/
 
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+
+          # Get the previous tag (if any)
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Generating changelog from $PREVIOUS_TAG to v$VERSION"
+            CHANGELOG=$(git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "First release - generating changelog from all commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Save to file for multiline output
+          echo "## What's Changed" > /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          echo "$CHANGELOG" >> /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...v$VERSION" >> /tmp/changelog.md
+
+          cat /tmp/changelog.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.2.2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: v${{ needs.check-version.outputs.version }}
-          generate_release_notes: true
+          body_path: /tmp/changelog.md
           files: |
             dist/*.whl
             dist/*.tar.gz

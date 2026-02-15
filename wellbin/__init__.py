@@ -5,7 +5,7 @@ A comprehensive tool for downloading and processing medical data from the Wellbi
 Supports both lab reports (FhirStudy) and medical imaging (DicomStudy) with PDF to Markdown conversion.
 """
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "feniix"
 __email__ = "feniix@gmail.com"
 
