@@ -46,6 +46,7 @@ from wellbin.core.exceptions import (
 )
 
 
+@pytest.mark.unit
 class TestWellbinError:
     """Tests for the base WellbinError exception class."""
 
@@ -93,6 +94,7 @@ class TestWellbinError:
         assert str(error).count("\n") == 3
 
 
+@pytest.mark.unit
 class TestAuthenticationExceptions:
     """Tests for authentication-related exception classes."""
 
@@ -128,6 +130,7 @@ class TestAuthenticationExceptions:
         assert "Token expired" in str(error)
 
 
+@pytest.mark.unit
 class TestNetworkExceptions:
     """Tests for network-related exception classes."""
 
@@ -162,6 +165,7 @@ class TestNetworkExceptions:
         assert "timed out" in str(error).lower()
 
 
+@pytest.mark.unit
 class TestBrowserExceptions:
     """Tests for browser-related exception classes."""
 
@@ -192,6 +196,7 @@ class TestBrowserExceptions:
         assert "wellbin.co" in str(error)
 
 
+@pytest.mark.unit
 class TestDataProcessingExceptions:
     """Tests for data processing exception classes."""
 
@@ -211,6 +216,7 @@ class TestDataProcessingExceptions:
         assert "unknown date" in str(error)
 
 
+@pytest.mark.unit
 class TestPDFProcessingExceptions:
     """Tests for PDF-related exception classes."""
 
@@ -282,6 +288,7 @@ class TestPDFProcessingExceptions:
         assert isinstance(error, WellbinError)
 
 
+@pytest.mark.unit
 class TestConfigurationException:
     """Tests for configuration exception classes."""
 
@@ -309,6 +316,7 @@ class TestConfigurationException:
         assert "WELLBIN_EMAIL" in str(error)
 
 
+@pytest.mark.unit
 class TestFileSystemExceptions:
     """Tests for file system exception classes."""
 
@@ -339,6 +347,7 @@ class TestFileSystemExceptions:
         assert "report.pdf" in str(error)
 
 
+@pytest.mark.unit
 class TestExceptionChaining:
     """Tests for exception chaining and re-raising."""
 
@@ -365,6 +374,7 @@ class TestExceptionChaining:
             assert isinstance(e.__cause__, RuntimeError)
 
 
+@pytest.mark.unit
 class TestExceptionHierarchy:
     """Tests for the complete exception hierarchy."""
 

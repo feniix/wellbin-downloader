@@ -13,7 +13,7 @@ from wellbin.core.converter import (
 )
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestPDFToMarkdownConverter:
     """Tests for PDFToMarkdownConverter class."""
 
@@ -223,7 +223,7 @@ class TestPDFToMarkdownConverter:
         assert mock_convert.call_count == 2
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestConvertStructuredDirectories:
     """Tests for convert_structured_directories function."""
 

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from wellbin.core.download_manager import PDFDownloadManager
 
 
+@pytest.mark.unit
 class TestPDFDownloadManager:
     """Tests for PDFDownloadManager class."""
 

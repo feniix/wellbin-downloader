@@ -12,7 +12,7 @@ from wellbin.cli import cli
 from wellbin.commands.config import config
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestCLIMain:
     """Tests for main CLI entry point."""
 
@@ -37,7 +37,7 @@ class TestCLIMain:
         assert len(result.output.strip()) > 0
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestConfigCommand:
     """Tests for config command."""
 
@@ -81,7 +81,7 @@ class TestConfigCommand:
                 assert "WELLBIN_PASSWORD=your-password" in content
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestScrapeCommand:
     """Tests for scrape command (without actual scraping)."""
 
@@ -135,7 +135,7 @@ class TestScrapeCommand:
             assert "dry run" in result.output.lower()
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestConvertCommand:
     """Tests for convert command."""
 

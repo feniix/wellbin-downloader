@@ -5,12 +5,15 @@ Focus on config resolution and helper functions.
 
 from unittest.mock import patch
 
+import pytest
+
 from wellbin.commands.convert import (
     ConvertConfig,
     resolve_config,
 )
 
 
+@pytest.mark.unit
 class TestConvertConfig:
     """Tests for ConvertConfig dataclass."""
 
@@ -41,6 +44,7 @@ class TestConvertConfig:
         assert config.enhanced_mode is True
 
 
+@pytest.mark.unit
 class TestResolveConvertConfig:
     """Tests for resolve_config function in convert module."""
 

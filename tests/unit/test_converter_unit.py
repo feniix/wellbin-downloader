@@ -20,6 +20,7 @@ from wellbin.core.exceptions import (
 )
 
 
+@pytest.mark.unit
 class TestConverterErrorHandling:
     """Tests for error handling paths in converter."""
 
@@ -59,6 +60,7 @@ class TestConverterErrorHandling:
                 assert "Failed to create" in str(exc_info.value)
 
 
+@pytest.mark.unit
 class TestConverterPDFSizeCheck:
     """Tests for PDF size checking functionality."""
 
@@ -100,6 +102,7 @@ class TestConverterPDFSizeCheck:
         converter._check_pdf_size(nonexistent)
 
 
+@pytest.mark.unit
 class TestConverterWriteMarkdown:
     """Tests for markdown file writing."""
 
@@ -137,6 +140,7 @@ class TestConverterWriteMarkdown:
             assert "Failed to write" in str(exc_info.value)
 
 
+@pytest.mark.unit
 class TestConverterPDFConversion:
     """Tests for PDF conversion error handling."""
 
@@ -216,6 +220,7 @@ class TestConverterPDFConversion:
             assert result is None
 
 
+@pytest.mark.unit
 class TestConverterFeatureStats:
     """Tests for feature statistics calculation."""
 
@@ -279,6 +284,7 @@ class TestConverterFeatureStats:
                 mock_log.assert_called()
 
 
+@pytest.mark.unit
 class TestConverterMedicalHeaderDetector:
     """Tests for medical header detection."""
 
@@ -339,6 +345,7 @@ class TestConverterMedicalHeaderDetector:
         assert converter.medical_header_detector(span_mixed) == "## "
 
 
+@pytest.mark.unit
 class TestConversionStats:
     """Tests for ConversionStats dataclass."""
 

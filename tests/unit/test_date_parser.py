@@ -27,6 +27,7 @@ from wellbin.core.date_parser import (
 )
 
 
+@pytest.mark.unit
 class TestIsValidDate:
     """Tests for is_valid_date function with edge cases."""
 
@@ -129,6 +130,7 @@ class TestIsValidDate:
         assert is_valid_date(year, month, day) is expected
 
 
+@pytest.mark.unit
 class TestParseAmbiguousDate:
     """Tests for _parse_ambiguous_date function."""
 
@@ -179,6 +181,7 @@ class TestParseAmbiguousDate:
         assert result is None
 
 
+@pytest.mark.unit
 class TestParseIsoDate:
     """Tests for _parse_iso_date function."""
 
@@ -211,6 +214,7 @@ class TestParseIsoDate:
         assert result is None
 
 
+@pytest.mark.unit
 class TestParseDayMonthYearDate:
     """Tests for _parse_day_month_year_date function (DD Mon YYYY)."""
 
@@ -232,6 +236,7 @@ class TestParseDayMonthYearDate:
         assert result == expected
 
 
+@pytest.mark.unit
 class TestParseMonthDayYearDate:
     """Tests for _parse_month_day_year_date function (Mon DD, YYYY)."""
 
@@ -253,6 +258,7 @@ class TestParseMonthDayYearDate:
         assert result == expected
 
 
+@pytest.mark.unit
 class TestParseDateFromText:
     """Tests for parse_date_from_text function with various patterns."""
 
@@ -359,6 +365,7 @@ class TestParseDateFromText:
         assert result1 == result2 == "20240315"
 
 
+@pytest.mark.unit
 class TestExtractDateFromStudyId:
     """Tests for extract_date_from_study_id function."""
 
@@ -393,6 +400,7 @@ class TestExtractDateFromStudyId:
         assert result is None
 
 
+@pytest.mark.unit
 class TestGetFallbackDate:
     """Tests for get_fallback_date function."""
 
@@ -418,6 +426,7 @@ class TestGetFallbackDate:
         assert DEFAULT_FALLBACK_DATE.isdigit()
 
 
+@pytest.mark.unit
 class TestDateParserIntegration:
     """Integration tests for date parser functions."""
 

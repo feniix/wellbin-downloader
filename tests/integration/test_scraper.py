@@ -17,7 +17,7 @@ from wellbin.core.date_parser import (
 from wellbin.core.scraper import PDFDownloadInfo, WellbinMedicalDownloader
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 class TestWellbinMedicalDownloader:
     """Tests for WellbinMedicalDownloader class."""
 

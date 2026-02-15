@@ -5,6 +5,8 @@ Focus on config resolution and helper functions.
 
 from unittest.mock import patch
 
+import pytest
+
 from wellbin.commands.scrape import (
     ScrapeConfig,
     _parse_study_types,
@@ -12,6 +14,7 @@ from wellbin.commands.scrape import (
 )
 
 
+@pytest.mark.unit
 class TestScrapeConfig:
     """Tests for ScrapeConfig dataclass."""
 
@@ -45,6 +48,7 @@ class TestScrapeConfig:
         assert config.headless is False
 
 
+@pytest.mark.unit
 class TestParseStudyTypes:
     """Tests for _parse_study_types function."""
 
@@ -79,6 +83,7 @@ class TestParseStudyTypes:
         assert result == ["all"]
 
 
+@pytest.mark.unit
 class TestResolveConfig:
     """Tests for resolve_config function."""
 
