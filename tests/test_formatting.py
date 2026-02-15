@@ -337,9 +337,7 @@ class TestDomainConvenienceFunctions:
     def test_url_info(self, mock_stdout):
         """Test url_info convenience function."""
         url_info("https://example.com")
-        assert (
-            "https://example.com" in mock_stdout.getvalue()
-        )  # CodeQL [py/incomplete-url-substring-sanitization] test assertion, not URL validation
+        assert "https://example.com" in mock_stdout.getvalue()
 
     @patch("sys.stdout", new_callable=StringIO)
     def test_file_info(self, mock_stdout):
