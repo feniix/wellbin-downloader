@@ -11,15 +11,14 @@ from unittest.mock import patch
 
 import pytest
 
-from wellbin.core.converter import (
-    PDFToMarkdownConverter,
-    convert_structured_directories,
-)
-
-from .fixtures.medical_fixtures import (
+from tests.fixtures.medical_fixtures import (
     EXPECTED_PATTERNS,
     get_fixture_path,
     validate_fixture_content,
+)
+from wellbin.core.converter import (
+    PDFToMarkdownConverter,
+    convert_structured_directories,
 )
 
 

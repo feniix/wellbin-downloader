@@ -159,3 +159,28 @@ class TestCreateConfigFile:
         content = env_file.read_text()
         assert "WELLBIN_EMAIL=your-email@example.com" in content
         assert "EXISTING_CONFIG=true" not in content
+
+    def test_create_config_file_exception_handling(self, tmp_path, monkeypatch):
+        """Test exception handling during config file creation."""
+        monkeypatch.chdir(tmp_path)
+
+        # Create existing .env file to trigger the overwrite path
+        env_file = tmp_path / ".env"
+        env_file.write_text("EXISTING_CONFIG=true")
+
+        # Mock open to raise an exception when trying to write
+        with patch("click.echo"), patch("click.confirm", return_value=True):
+            with patch("builtins.open", side_effect=OSError("Disk full")):
+                # Should not raise, just print error
+                create_config_file()
+
+    def test_get_env_or_default_bool_already_bool(self):
+        """Test that bool defaults are returned directly without conversion."""
+        # When the default is already a bool, it should be returned directly
+        result = get_env_or_default("NONEXISTENT_BOOL", True, bool)
+        assert result is True
+        assert isinstance(result, bool)
+
+        result = get_env_or_default("NONEXISTENT_BOOL", False, bool)
+        assert result is False
+        assert isinstance(result, bool)
