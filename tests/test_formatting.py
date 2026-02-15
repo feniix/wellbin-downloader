@@ -5,6 +5,8 @@ Tests for wellbin.core.formatting module.
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from wellbin.core.formatting import (
     DOMAIN_EMOJIS,
     EMOJI_PREFIXES,
@@ -34,6 +36,7 @@ from wellbin.core.formatting import (
 )
 
 
+@pytest.mark.unit
 class TestOutputLevel:
     """Tests for OutputLevel enum."""
 
@@ -46,6 +49,7 @@ class TestOutputLevel:
         assert OutputLevel.DEBUG.value == "debug"
 
 
+@pytest.mark.unit
 class TestEmojiPrefixes:
     """Tests for emoji prefix constants."""
 
@@ -63,6 +67,7 @@ class TestEmojiPrefixes:
             assert isinstance(emoji, str), f"Emoji for {level} should be string"
 
 
+@pytest.mark.unit
 class TestDomainEmojis:
     """Tests for domain-specific emoji constants."""
 
@@ -87,6 +92,7 @@ class TestDomainEmojis:
             assert isinstance(emoji, str), f"Emoji for {key} should be string"
 
 
+@pytest.mark.unit
 class TestEmit:
     """Tests for emit function."""
 
@@ -123,6 +129,7 @@ class TestEmit:
         assert "Indented message" in output
 
 
+@pytest.mark.unit
 class TestEmitWithEmoji:
     """Tests for emit_with_emoji function."""
 
@@ -151,6 +158,7 @@ class TestEmitWithEmoji:
         assert "Processing data" in output
 
 
+@pytest.mark.unit
 class TestEmitHeader:
     """Tests for emit_header function."""
 
@@ -179,6 +187,7 @@ class TestEmitHeader:
         assert "=" * 40 in output
 
 
+@pytest.mark.unit
 class TestEmitSeparator:
     """Tests for emit_separator function."""
 
@@ -197,6 +206,7 @@ class TestEmitSeparator:
         assert "-" * 40 in output
 
 
+@pytest.mark.unit
 class TestEmitList:
     """Tests for emit_list function."""
 
@@ -234,6 +244,7 @@ class TestEmitList:
         assert output == ""
 
 
+@pytest.mark.unit
 class TestEmitKeyValue:
     """Tests for emit_key_value function."""
 
@@ -260,6 +271,7 @@ class TestEmitKeyValue:
         assert output == ""
 
 
+@pytest.mark.unit
 class TestConvenienceFunctions:
     """Tests for convenience output functions."""
 
@@ -294,6 +306,7 @@ class TestConvenienceFunctions:
         assert "Debug message" in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestDomainConvenienceFunctions:
     """Tests for domain-specific convenience functions."""
 
@@ -358,6 +371,7 @@ class TestDomainConvenienceFunctions:
         assert "1.5 MB" in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestFormatBytes:
     """Tests for format_bytes function."""
 
@@ -390,6 +404,7 @@ class TestFormatBytes:
         assert format_bytes(1649267441664) == "1.5 TB"
 
 
+@pytest.mark.unit
 class TestEmitFileSaved:
     """Tests for emit_file_saved function."""
 

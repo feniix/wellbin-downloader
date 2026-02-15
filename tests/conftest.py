@@ -2,22 +2,12 @@
 Pytest configuration and common fixtures for wellbin tests.
 """
 
-import tempfile
-from pathlib import Path
-
 import pytest
 
 from .fixtures.medical_fixtures import (
     get_fixture_content,
     get_medical_data_directory,
 )
-
-
-@pytest.fixture
-def temp_dir():
-    """Create a temporary directory for test files."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
 
 
 @pytest.fixture

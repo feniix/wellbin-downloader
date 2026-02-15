@@ -35,6 +35,7 @@ def _reset_global_output():
     reset_output()
 
 
+@pytest.mark.unit
 class TestLogLevel:
     """Tests for LogLevel enum."""
 
@@ -53,6 +54,7 @@ class TestLogLevel:
         assert len(LogLevel) == 7
 
 
+@pytest.mark.unit
 class TestOutputConfig:
     """Tests for OutputConfig dataclass."""
 
@@ -72,6 +74,7 @@ class TestOutputConfig:
         assert config.line_width == 80
 
 
+@pytest.mark.unit
 class TestOutputInit:
     """Tests for Output initialization."""
 
@@ -90,6 +93,7 @@ class TestOutputInit:
         assert out.config.line_width == 80
 
 
+@pytest.mark.unit
 class TestOutputMessage:
     """Tests for Output.message() method."""
 
@@ -146,6 +150,7 @@ class TestOutputMessage:
         assert LogLevel.SUCCESS.value not in output
 
 
+@pytest.mark.unit
 class TestOutputLog:
     """Tests for Output.log() method."""
 
@@ -184,6 +189,7 @@ class TestOutputLog:
         assert "URL: https://example.com" in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestOutputStep:
     """Tests for Output.step() method."""
 
@@ -209,6 +215,7 @@ class TestOutputStep:
         assert "\U0001f4c4" not in output
 
 
+@pytest.mark.unit
 class TestOutputTraceback:
     """Tests for Output.traceback() method."""
 
@@ -237,6 +244,7 @@ class TestOutputTraceback:
         assert "RuntimeError" in output
 
 
+@pytest.mark.unit
 class TestOutputIndent:
     """Tests for indent/dedent state management."""
 
@@ -280,6 +288,7 @@ class TestOutputIndent:
         assert out._indent() == "    "  # 4 spaces
 
 
+@pytest.mark.unit
 class TestOutputHeader:
     """Tests for Output.header() method."""
 
@@ -301,6 +310,7 @@ class TestOutputHeader:
         assert "-" * 60 in output
 
 
+@pytest.mark.unit
 class TestOutputSeparator:
     """Tests for Output.separator() method."""
 
@@ -319,6 +329,7 @@ class TestOutputSeparator:
         assert "-" * 60 in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestOutputItem:
     """Tests for Output.item() and subitem() methods."""
 
@@ -348,6 +359,7 @@ class TestOutputItem:
         assert "Sub detail" in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestOutputConvenienceMethods:
     """Tests for convenience methods (info, success, error, etc.)."""
 
@@ -416,6 +428,7 @@ class TestOutputConvenienceMethods:
         assert "Section Title" in output
 
 
+@pytest.mark.unit
 class TestOutputLogging:
     """Tests for Python logging integration."""
 
@@ -468,6 +481,7 @@ class TestOutputLogging:
         assert "=" * 60 in mock_stdout.getvalue()
 
 
+@pytest.mark.unit
 class TestGetOutput:
     """Tests for get_output() singleton."""
 
@@ -490,6 +504,7 @@ class TestGetOutput:
         assert out1 is not out2
 
 
+@pytest.mark.unit
 class TestConfigureOutput:
     """Tests for configure_output() function."""
 
@@ -514,6 +529,7 @@ class TestConfigureOutput:
         assert out.config.line_width == 60
 
 
+@pytest.mark.unit
 class TestModuleLevelFunctions:
     """Tests for module-level convenience functions."""
 

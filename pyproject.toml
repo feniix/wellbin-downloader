@@ -80,16 +80,41 @@ addopts = [
     "-q",
     "--strict-markers",
     "--strict-config",
-    "--cov=wellbin",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-fail-under=30"
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (using real medical data)",
     "unit: marks tests as unit tests"
 ]
+
+[tool.coverage.run]
+source = ["wellbin"]
+branch = true
+relative_files = true
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 65
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@overload",
+    "@abstractmethod",
+    "raise NotImplementedError",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.pyright]
 include = ["wellbin"]

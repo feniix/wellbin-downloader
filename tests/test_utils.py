@@ -5,6 +5,8 @@ Tests for wellbin.core.utils module.
 import os
 from unittest.mock import patch
 
+import pytest
+
 from wellbin.core.utils import (
     create_config_file,
     get_env_or_default,
@@ -12,6 +14,7 @@ from wellbin.core.utils import (
 )
 
 
+@pytest.mark.unit
 class TestGetEnvOrDefault:
     """Tests for get_env_or_default function."""
 
@@ -66,6 +69,7 @@ class TestGetEnvOrDefault:
                 assert result is False, f"Failed for value: {value}"
 
 
+@pytest.mark.unit
 class TestValidateCredentials:
     """Tests for validate_credentials function."""
 
@@ -100,19 +104,20 @@ class TestValidateCredentials:
         assert "Password not configured" in message
 
 
+@pytest.mark.unit
 class TestCreateConfigFile:
     """Tests for create_config_file function."""
 
-    def test_create_config_file_new(self, temp_dir, monkeypatch):
+    def test_create_config_file_new(self, tmp_path, monkeypatch):
         """Test creating new config file."""
         # Change to temp directory
-        monkeypatch.chdir(temp_dir)
+        monkeypatch.chdir(tmp_path)
 
         # Mock click module functions
         with patch("click.echo"):
             create_config_file()
 
-        env_file = temp_dir / ".env"
+        env_file = tmp_path / ".env"
         assert env_file.exists()
 
         content = env_file.read_text()
@@ -120,13 +125,13 @@ class TestCreateConfigFile:
         assert "WELLBIN_PASSWORD=your-password" in content
         assert "WELLBIN_OUTPUT_DIR=medical_data" in content
 
-    def test_create_config_file_existing_no_overwrite(self, temp_dir, monkeypatch):
+    def test_create_config_file_existing_no_overwrite(self, tmp_path, monkeypatch):
         """Test handling existing config file without overwrite."""
         # Change to temp directory
-        monkeypatch.chdir(temp_dir)
+        monkeypatch.chdir(tmp_path)
 
         # Create existing .env file
-        env_file = temp_dir / ".env"
+        env_file = tmp_path / ".env"
         env_file.write_text("EXISTING_CONFIG=true")
         original_content = env_file.read_text()
 
@@ -137,13 +142,13 @@ class TestCreateConfigFile:
         # File should remain unchanged
         assert env_file.read_text() == original_content
 
-    def test_create_config_file_existing_with_overwrite(self, temp_dir, monkeypatch):
+    def test_create_config_file_existing_with_overwrite(self, tmp_path, monkeypatch):
         """Test overwriting existing config file."""
         # Change to temp directory
-        monkeypatch.chdir(temp_dir)
+        monkeypatch.chdir(tmp_path)
 
         # Create existing .env file
-        env_file = temp_dir / ".env"
+        env_file = tmp_path / ".env"
         env_file.write_text("EXISTING_CONFIG=true")
 
         # Mock click functions to confirm overwrite

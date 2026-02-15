@@ -5,12 +5,14 @@ Tests for wellbin CLI commands.
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from wellbin.cli import cli
 from wellbin.commands.config import config
 
 
+@pytest.mark.unit
 class TestCLIMain:
     """Tests for main CLI entry point."""
 
@@ -35,6 +37,7 @@ class TestCLIMain:
         assert len(result.output.strip()) > 0
 
 
+@pytest.mark.unit
 class TestConfigCommand:
     """Tests for config command."""
 
@@ -46,7 +49,7 @@ class TestConfigCommand:
         assert result.exit_code == 0
         assert "Create a .env configuration file" in result.output
 
-    def test_config_command_creates_file(self, temp_dir):
+    def test_config_command_creates_file(self):
         """Test config command creates .env file."""
         runner = CliRunner()
 
@@ -78,6 +81,7 @@ class TestConfigCommand:
                 assert "WELLBIN_PASSWORD=your-password" in content
 
 
+@pytest.mark.unit
 class TestScrapeCommand:
     """Tests for scrape command (without actual scraping)."""
 
@@ -131,6 +135,7 @@ class TestScrapeCommand:
             assert "dry run" in result.output.lower()
 
 
+@pytest.mark.unit
 class TestConvertCommand:
     """Tests for convert command."""
 
@@ -144,7 +149,7 @@ class TestConvertCommand:
         assert "--enhanced-mode" in result.output
         assert "--file-type" in result.output
 
-    def test_convert_command_no_pdfs(self, temp_dir):
+    def test_convert_command_no_pdfs(self, tmp_path):
         """Test convert command with no PDF files."""
         runner = CliRunner()
 
@@ -162,9 +167,9 @@ class TestConvertCommand:
                 [
                     "convert",
                     "--input-dir",
-                    str(temp_dir),
+                    str(tmp_path),
                     "--output-dir",
-                    str(temp_dir / "output"),
+                    str(tmp_path / "output"),
                 ],
             )
 
@@ -179,7 +184,7 @@ class TestConvertCommand:
                 # Just verify the command ran successfully
                 assert "Convert medical PDFs" in result.output or "No files were converted" in result.output
 
-    def test_convert_command_enhanced_mode(self, temp_dir):
+    def test_convert_command_enhanced_mode(self, tmp_path):
         """Test convert command with enhanced mode."""
         runner = CliRunner()
 
@@ -197,9 +202,9 @@ class TestConvertCommand:
                     "convert",
                     "--enhanced-mode",
                     "--input-dir",
-                    str(temp_dir),
+                    str(tmp_path),
                     "--output-dir",
-                    str(temp_dir / "output"),
+                    str(tmp_path / "output"),
                 ],
             )
 

@@ -23,6 +23,7 @@ from .fixtures.medical_fixtures import (
 )
 
 
+@pytest.mark.integration
 class TestMedicalDataIntegration:
     """Integration tests using anonymized medical data fixtures."""
 
@@ -177,12 +178,11 @@ class TestMedicalDataIntegration:
             f"Imaging older filename should match pattern: {imaging_older_path.name}"
         )
 
-    @pytest.mark.integration
-    def test_converter_with_fixture_content(self, temp_dir, sample_lab_report_recent):
+    def test_converter_with_fixture_content(self, tmp_path, sample_lab_report_recent):
         """Test the converter using fixture content to simulate PDF conversion."""
         # Create test input directory with a mock PDF file
-        input_dir = temp_dir / "input"
-        output_dir = temp_dir / "output"
+        input_dir = tmp_path / "input"
+        output_dir = tmp_path / "output"
         input_dir.mkdir()
 
         # Create a mock PDF file (just a placeholder)
@@ -211,10 +211,10 @@ class TestMedicalDataIntegration:
             assert "20230615-lab-0" in content
             assert "HEMOGRAMA COMPLETO" in content
 
-    def test_structured_directories_with_fixture_layout(self, medical_fixtures_dir, temp_dir):
+    def test_structured_directories_with_fixture_layout(self, medical_fixtures_dir, tmp_path):
         """Test that structured conversion works with fixture directory layout."""
         # Create a structured input directory similar to the fixture layout
-        input_dir = temp_dir / "input"
+        input_dir = tmp_path / "input"
         lab_dir = input_dir / "lab_reports"
         imaging_dir = input_dir / "imaging_reports"
 
@@ -230,7 +230,7 @@ class TestMedicalDataIntegration:
         for pdf_file in [lab_pdf1, lab_pdf2, imaging_pdf1, imaging_pdf2]:
             pdf_file.write_bytes(b"%PDF-1.4 mock pdf content")
 
-        output_dir = temp_dir / "output"
+        output_dir = tmp_path / "output"
 
         # Mock the actual conversion process
         with patch("wellbin.core.converter.PDFToMarkdownConverter") as mock_converter_class:

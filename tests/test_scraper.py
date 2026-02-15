@@ -17,11 +17,12 @@ from wellbin.core.date_parser import (
 from wellbin.core.scraper import PDFDownloadInfo, WellbinMedicalDownloader
 
 
+@pytest.mark.unit
 class TestWellbinMedicalDownloader:
     """Tests for WellbinMedicalDownloader class."""
 
     @pytest.fixture
-    def downloader(self, temp_dir):
+    def downloader(self, tmp_path):
         """Create a WellbinMedicalDownloader instance for testing."""
         return WellbinMedicalDownloader(
             email="test@example.com",
@@ -29,19 +30,19 @@ class TestWellbinMedicalDownloader:
             headless=True,
             limit_studies=5,
             study_types=["FhirStudy"],
-            output_dir=str(temp_dir),
+            output_dir=str(tmp_path),
         )
 
-    def test_downloader_initialization(self, downloader, temp_dir):
+    def test_downloader_initialization(self, downloader, tmp_path):
         """Test downloader initialization."""
         assert downloader.email == "test@example.com"
         assert downloader.password == "testpassword"
         assert downloader.headless is True
         assert downloader.limit_studies == 5
         assert downloader.study_types == ["FhirStudy"]
-        assert downloader.output_dir == str(temp_dir)
+        assert downloader.output_dir == str(tmp_path)
 
-    def test_downloader_default_values(self, temp_dir):
+    def test_downloader_default_values(self, tmp_path):
         """Test downloader with default values."""
         downloader = WellbinMedicalDownloader(email="test@example.com", password="testpassword")
 
@@ -75,13 +76,13 @@ class TestWellbinMedicalDownloader:
         assert any("--headless" in str(arg) for arg in options_call.arguments)
 
     @patch("wellbin.core.scraper.webdriver.Chrome")
-    def test_setup_driver_visible(self, mock_chrome, temp_dir):
+    def test_setup_driver_visible(self, mock_chrome, tmp_path):
         """Test driver setup in visible mode."""
         downloader = WellbinMedicalDownloader(
             email="test@example.com",
             password="testpassword",
             headless=False,
-            output_dir=str(temp_dir),
+            output_dir=str(tmp_path),
         )
 
         mock_driver = Mock()
@@ -159,7 +160,7 @@ class TestWellbinMedicalDownloader:
         assert filename == "20240101-lab-0.pdf"  # Should use fallback date
 
     @patch("wellbin.core.scraper.requests.Session.get")
-    def test_download_pdf_success(self, mock_get, downloader, mock_study_info, temp_dir):
+    def test_download_pdf_success(self, mock_get, downloader, mock_study_info, tmp_path):
         """Test successful PDF download."""
         # Mock successful response
         mock_response = Mock()
@@ -605,10 +606,10 @@ class TestWellbinMedicalDownloader:
         assert result is None
 
     @patch("wellbin.core.scraper.requests.Session.get")
-    def test_download_pdf_file_saved_correctly(self, mock_get, downloader, mock_study_info, temp_dir):
+    def test_download_pdf_file_saved_correctly(self, mock_get, downloader, mock_study_info, tmp_path):
         """Test that downloaded PDF file is saved correctly."""
         # Update output dir to temp
-        downloader.output_dir = str(temp_dir)
+        downloader.output_dir = str(tmp_path)
 
         mock_response = Mock()
         mock_response.status_code = 200

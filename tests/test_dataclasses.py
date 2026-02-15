@@ -4,10 +4,13 @@ Tests for wellbin dataclasses and structured data.
 
 from pathlib import Path
 
+import pytest
+
 from wellbin.core.converter import ConversionResult, ConversionStats
 from wellbin.core.scraper import DownloadResult, PDFDownloadInfo
 
 
+@pytest.mark.unit
 class TestPDFDownloadInfo:
     """Tests for PDFDownloadInfo dataclass."""
 
@@ -56,6 +59,7 @@ class TestPDFDownloadInfo:
         assert info.study_index == 10
 
 
+@pytest.mark.unit
 class TestDownloadResult:
     """Tests for DownloadResult dataclass."""
 
@@ -93,6 +97,7 @@ class TestDownloadResult:
         assert result.study_index == 3
 
 
+@pytest.mark.unit
 class TestConversionStats:
     """Tests for ConversionStats dataclass."""
 
@@ -139,6 +144,7 @@ class TestConversionStats:
         assert stats.total_bytes == 50000
 
 
+@pytest.mark.unit
 class TestConversionResult:
     """Tests for ConversionResult dataclass."""
 
@@ -194,6 +200,7 @@ class TestConversionResult:
         assert len(result.failed_files) == 1
 
 
+@pytest.mark.unit
 class TestDataclassIntegration:
     """Integration tests for dataclass usage patterns."""
 
